@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bhumika Collection">
+    <title>Bhumika Collection - Cloud POS & AI Analytics</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        mono: ['"Courier Prime"', '"Courier New"', 'Courier', 'monospace']
+                    },
+                    boxShadow: {
+                        'premium': '0 10px 40px -10px rgba(0,0,0,0.08)',
+                        'premium-hover': '0 20px 40px -10px rgba(0,0,0,0.12)',
+                        'glow-rose': '0 0 20px -5px rgba(225, 29, 72, 0.4)',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .glass-header { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        
+        .receipt-shadow { box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.15), 0 4px 12px -4px rgba(0, 0, 0, 0.1); }
+        .receipt-paper::before {
+            content: ""; position: absolute; top: -6px; left: 0; right: 0; height: 6px;
+            background: linear-gradient(45deg, transparent 33.333%, #ffffff 33.333%, #ffffff 66.667%, transparent 66.667%),
+                        linear-gradient(-45deg, transparent 33.333%, #ffffff 33.333%, #ffffff 66.667%, transparent 66.667%);
+            background-size: 12px 24px;
+        }
+        .receipt-paper::after {
+            content: ""; position: absolute; bottom: -6px; left: 0; right: 0; height: 6px;
+            background: linear-gradient(135deg, #ffffff 33.333%, transparent 33.333%, transparent 66.667%, #ffffff 66.667%),
+                        linear-gradient(-135deg, #ffffff 33.333%, transparent 33.333%, transparent 66.667%, #ffffff 66.667%);
+            background-size: 12px 24px;
+        }
+
+        /* Force crisp system fonts and disable anti-aliasing for razor-sharp thermal printing */
+        .receipt-paper, .receipt-paper * {
+            font-family: 'Courier New', Courier, monospace !important;
+            -webkit-font-smoothing: none !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            text-rendering: optimizeSpeed !important;
+        }
+        
+        /* Prevent image blurriness (QR codes & Logos) */
+        .receipt-paper img, .receipt-paper canvas {
+            image-rendering: -moz-crisp-edges !important;
+            image-rendering: -o-crisp-edges !important;
+            image-rendering: -webkit-optimize-contrast !important;
+            image-rendering: crisp-edges !important;
+            image-rendering: pixelated !important;
+        }
+
+        /* Custom Scrollbar for premium feel */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        
+        @media print {
+            @page { margin: 0; padding: 0; }
+            html, body { 
+                margin: 0 !important; 
+                padding: 0 !important; 
+                background: #ffffff !important; 
+                color: #000000 !important; 
+                width: 100%; 
+                -webkit-print-color-adjust: exact !important; 
+                print-color-adjust: exact !important; 
+                zoom: 1 !important;
+            }
+            .no-print { display: none !important; }
+            #printableReceiptWrapper { display: block !important; margin: 0 !important; padding: 0 !important; width: 100% !important; box-shadow: none !important; border: none !important; overflow: visible !important; }
+            #receiptPreviewPaper { margin: 0 !important; padding: 2mm 3mm !important; box-shadow: none !important; border: none !important; color: #000000 !important; background: #ffffff !important; transform: none !important; width: 100% !important; max-width: 100% !important; }
+            #receiptPreviewPaper * { color: #000000 !important; border-color: #000000 !important; }
+            .receipt-paper::before, .receipt-paper::after { display: none !important; }
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-950 text-slate-100 font-sans transition-colors duration-200">
+
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-[60] flex flex-col space-y-2 pointer-events-none no-print"></div>
+
+    <!-- Admin PIN Modal -->
+    <div id="pinModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 no-print transition-opacity">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl transform transition-transform scale-100">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-rose-100 dark:bg-rose-900/30 rounded-full flex items-center justify-center mx-auto mb-3 text-rose-600">
+                    <i class="fa-solid fa-lock text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 dark:text-white">Admin Authentication</h3>
+                <p class="text-xs text-slate-500 mt-1">Enter PIN to access Admin Mode</p>
+            </div>
+            <input type="password" id="adminPinInput" placeholder="••••" maxlength="4" class="w-full text-center text-2xl tracking-[0.5em] px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 focus:border-rose-500 focus:ring-0 outline-none transition-colors mb-4 font-mono">
+            <div class="flex space-x-3">
+                <button onclick="closePinModal()" class="flex-1 py-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold transition-colors">Cancel</button>
+                <button onclick="verifyAdminPin()" class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-glow-rose transition-all">Unlock</button>
+            </div>
+            <p class="text-[10px] text-center text-slate-400 mt-4">Default PIN is 1234</p>
+        </div>
+    </div>
+
+    <!-- Held Bills Modal -->
+    <div id="heldBillsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4 no-print">
+        <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-lg font-bold flex items-center space-x-2"><i class="fa-solid fa-pause text-amber-500"></i><span>Bills on Hold</span></h3>
+                <button onclick="closeHeldBillsModal()" class="text-slate-400 hover:text-slate-700"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+            <div id="heldBillsList" class="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- System Update Modal -->
+    <div id="updateModal" class="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-md hidden flex items-center justify-center p-4 no-print">
+        <div class="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-8 shadow-2xl text-center relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-slate-100 dark:bg-slate-800">
+                <div id="updateProgressBar" class="h-full bg-gradient-to-r from-rose-500 to-indigo-500 w-0 transition-all duration-500 ease-out"></div>
+            </div>
+            <div class="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center mx-auto mb-5 text-indigo-600">
+                <i id="updateIcon" class="fa-solid fa-cloud-arrow-down text-3xl"></i>
+                <i id="updateSpinner" class="fa-solid fa-arrows-rotate text-3xl animate-spin hidden"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 dark:text-white mb-2">System Updater</h3>
+            <p id="updateStatusText" class="text-sm text-slate-500 font-medium">Initializing connection...</p>
+        </div>
+    </div>
+
+    <div class="min-h-full flex flex-col">
+        <header class="glass-header border-b border-slate-200/80 dark:border-slate-800/80 sticky top-0 z-30 px-4 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 no-print transition-colors">
+            <div class="flex items-center space-x-3">
+                <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-600 to-amber-500 flex items-center justify-center text-white shadow-glow-rose">
+                    <i class="fa-solid fa-gem text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-xl font-black tracking-tight text-slate-900 dark:text-white">BHUMIKA <span class="text-rose-600">COLLECTION</span></h1>
+                        <div id="cloudSyncStatus" class="flex items-center space-x-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100/80 text-emerald-700 border border-emerald-200">
+                            <i class="fa-solid fa-cloud-arrow-up animate-pulse"></i><span>Synced</span>
+                        </div>
+                    </div>
+                    <p class="text-[11px] font-medium text-slate-500 dark:text-slate-400">Enterprise Cloud POS System</p>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs & Role Switcher -->
+            <div class="flex items-center space-x-2 sm:space-x-4">
+                
+                <!-- Premium Role Switcher -->
+                <div onclick="handleRoleSwitchClick()" class="hidden sm:flex items-center space-x-2 px-3 py-2 bg-slate-800/80 hover:bg-slate-700 rounded-xl border border-slate-700/50 cursor-pointer transition-all shadow-sm group">
+                    <div class="w-6 h-6 rounded-full bg-indigo-900/50 flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-transform">
+                        <i id="roleIcon" class="fa-solid fa-user-shield text-[10px]"></i>
+                    </div>
+                    <span id="currentRoleDisplay" class="text-xs font-bold text-slate-300">Admin</span>
+                    <i class="fa-solid fa-chevron-down text-[10px] text-slate-400"></i>
+                </div>
+
+                <!-- Tab Switcher -->
+                <div class="bg-slate-800/80 p-1.5 rounded-2xl flex flex-wrap gap-1 border border-slate-700/50 shadow-sm backdrop-blur-sm">
+                    <button onclick="switchTab('pos')" id="tabBtnPos" class="px-4 py-2 rounded-xl text-xs font-bold bg-slate-900 text-rose-400 shadow-sm transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-cash-register"></i><span>POS</span>
+                    </button>
+                    <button onclick="switchTab('inventory')" id="tabBtnInventory" class="admin-only px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900/50 transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-boxes-stacked"></i><span>Inventory</span>
+                    </button>
+                    <button onclick="switchTab('history')" id="tabBtnHistory" class="px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900/50 transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-clock-rotate-left"></i><span>History</span>
+                    </button>
+                    <button onclick="switchTab('analytics')" id="tabBtnAnalytics" class="admin-only px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900/50 transition-all flex items-center space-x-2 relative overflow-hidden group">
+                        <i class="fa-solid fa-wand-magic-sparkles group-hover:animate-pulse text-purple-500"></i>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-rose-400">AI Insights</span>
+                    </button>
+                    <button onclick="switchTab('settings')" id="tabBtnSettings" class="admin-only px-4 py-2 rounded-xl text-xs font-bold text-slate-400 hover:text-white hover:bg-slate-900/50 transition-all flex items-center space-x-2">
+                        <i class="fa-solid fa-gear"></i><span class="hidden sm:inline">Setup</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 lg:p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            
+            <!-- LEFT COLUMN -->
+            <div class="xl:col-span-8 space-y-5 no-print">
+
+                <div id="tabContentPos" class="space-y-5">
+                    
+                    <!-- Hardware & Smart Actions Row -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Connection -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-premium">
+                            <div class="flex items-center justify-between mb-3">
+                                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                                    <i class="fa-solid fa-plug text-rose-500"></i><span>Hardware</span>
+                                </h2>
+                                <select id="paperWidthSelect" onchange="changePaperSize()" class="text-xs font-bold bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 focus:outline-none">
+                                    <option value="58">58mm (2")</option>
+                                    <option value="80">80mm (3")</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button onclick="connectBluetooth()" class="py-2.5 px-2 rounded-xl bg-indigo-900/20 hover:bg-indigo-900/40 text-indigo-300 font-bold text-xs transition-colors border border-indigo-800/50"><i class="fa-brands fa-bluetooth-b mr-1"></i>BLE Printer</button>
+                                <button onclick="systemDriverPrint()" class="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors border border-slate-700"><i class="fa-solid fa-desktop mr-1"></i>System Print</button>
+                            </div>
+                        </div>
+
+                        <!-- Customer Details -->
+                        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-premium relative">
+                            <div class="flex items-center justify-between mb-3">
+                                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-2">
+                                    <i class="fa-solid fa-user text-indigo-500"></i><span>Customer</span>
+                                </h2>
+                                <div id="loyaltyBadge" class="hidden flex items-center space-x-1 text-[10px] bg-amber-950/60 border border-amber-800 px-2 py-0.5 rounded-full shadow-sm">
+                                    <!-- Injected -->
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="text" id="custName" placeholder="Name" oninput="updateReceipt()" class="px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-sm focus:ring-2 focus:ring-rose-500 focus:bg-slate-900 outline-none transition-all">
+                                <input type="tel" id="custPhone" placeholder="Mobile Number" maxlength="10" oninput="checkLoyalty()" class="px-3 py-2 rounded-xl border border-slate-800 bg-slate-950 text-sm focus:ring-2 focus:ring-rose-500 focus:bg-slate-900 outline-none transition-all">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Main Billing Area -->
+                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-premium">
+                        
+                        <!-- Actions Row -->
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="px-3 py-1.5 bg-slate-800 rounded-xl border border-slate-700 flex items-center space-x-2">
+                                    <span class="text-xs font-medium text-slate-400">Bill No:</span>
+                                    <input type="text" id="invoiceNoInput" value="BC-1001" oninput="updateReceipt()" class="w-20 bg-transparent text-xs font-bold font-mono outline-none text-white">
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="holdCurrentBill()" class="px-3 py-1.5 rounded-lg bg-amber-950/50 hover:bg-amber-900/60 text-amber-400 text-xs font-bold transition-colors border border-amber-800/40"><i class="fa-solid fa-pause mr-1"></i>Hold</button>
+                                <button onclick="showHeldBills()" class="px-3 py-1.5 rounded-lg bg-indigo-950/50 hover:bg-indigo-900/60 text-indigo-400 text-xs font-bold transition-colors border border-indigo-800/40"><i class="fa-solid fa-folder-open mr-1"></i>Recall</button>
+                                <div class="w-px h-5 bg-slate-700 mx-1"></div>
+                                <button onclick="clearCart()" class="px-3 py-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition-colors border border-rose-800/40"><i class="fa-solid fa-trash mr-1"></i>Clear</button>
+                            </div>
+                        </div>
+
+                        <!-- Barcode & Search Input -->
+                        <div class="relative mb-3 group">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i class="fa-solid fa-barcode text-slate-400 group-focus-within:text-rose-500 transition-colors text-lg"></i>
+                            </div>
+                            <input type="text" id="newItemName" autocomplete="off" placeholder="Scan Barcode or Type Product Name..." oninput="handleProductSearchInput(this.value)" onfocus="handleProductSearchInput(this.value)" onkeydown="handleSearchKeydown(event)" class="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-700 bg-slate-950 text-base font-medium focus:border-rose-500 focus:bg-slate-900 focus:shadow-glow-rose outline-none transition-all text-white">
+                            
+                            <!-- Dropdown -->
+                            <div id="searchAutocompleteDropdown" class="hidden absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl z-40 max-h-64 overflow-y-auto overflow-x-hidden p-2"></div>
+                        </div>
+
+                        <!-- Quick Add Grid (Premium feature) -->
+                        <div class="mb-5">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">Quick Add Categories</p>
+                            <div id="quickItemsGrid" class="flex overflow-x-auto pb-2 gap-2 snap-x hide-scrollbar">
+                                <!-- Injected via JS -->
+                            </div>
+                        </div>
+
+                        <!-- Manual Entry Row -->
+                        <div class="grid grid-cols-12 gap-2 mb-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
+                            <div class="col-span-4 sm:col-span-8 flex items-center px-2">
+                                <span class="text-xs font-medium text-slate-400">Custom Item Entry</span>
+                            </div>
+                            <div class="col-span-3 sm:col-span-1">
+                                <input type="number" id="newItemQty" value="1" min="1" onkeydown="if(event.key==='Enter') addItem()" class="w-full px-2 py-2 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold text-center outline-none focus:border-rose-500 transition-colors text-white">
+                            </div>
+                            <div class="col-span-5 sm:col-span-2">
+                                <input type="number" id="newItemPrice" placeholder="Rate ₹" onkeydown="if(event.key==='Enter') addItem()" class="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-950 text-sm font-mono font-bold outline-none focus:border-rose-500 transition-colors text-white">
+                            </div>
+                            <div class="col-span-12 sm:col-span-1">
+                                <button onclick="addItem()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold shadow-sm transition-colors"><i class="fa-solid fa-plus"></i></button>
+                            </div>
+                        </div>
+
+                        <!-- Cart Table -->
+                        <div class="overflow-x-auto min-h-[200px] rounded-2xl border border-slate-800 bg-slate-900">
+                            <table class="w-full text-left text-sm">
+                                <thead class="bg-slate-800/80 text-[11px] text-slate-400 font-bold uppercase tracking-wider border-b border-slate-800">
+                                    <tr>
+                                        <th class="p-3 pl-4">Particulars</th>
+                                        <th class="p-3 text-center w-20">Qty</th>
+                                        <th class="p-3 text-right w-24">Rate</th>
+                                        <th class="p-3 text-right w-28 pr-4">Amount</th>
+                                        <th class="p-3 text-center w-12"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="itemsTableBody" class="divide-y divide-slate-800">
+                                    <!-- Injected -->
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Calculation Controls -->
+                        <div class="mt-5 pt-4 border-t border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            
+                            <!-- Discounts & Taxes -->
+                            <div class="space-y-3">
+                                <div class="flex items-center space-x-2 p-2 rounded-xl bg-rose-950/20 border border-rose-900/30">
+                                    <div class="w-8 h-8 rounded-lg bg-rose-900/50 flex items-center justify-center text-rose-400"><i class="fa-solid fa-tag text-xs"></i></div>
+                                    <select id="discountType" onchange="updateReceipt()" class="bg-transparent text-xs font-bold focus:outline-none text-slate-300">
+                                        <option value="flat" class="bg-slate-900">₹ Flat</option>
+                                        <option value="percent" class="bg-slate-900">% Off</option>
+                                    </select>
+                                    <input type="number" id="discountValue" value="0" oninput="updateReceipt()" class="w-20 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-700 text-sm font-bold text-center outline-none focus:border-rose-500 transition-colors text-white">
+                                </div>
+                                <div class="flex items-center space-x-2 p-2 rounded-xl bg-slate-900/50 border border-slate-800">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-slate-400"><i class="fa-solid fa-file-invoice text-xs"></i></div>
+                                    <span class="text-xs font-bold text-slate-400">GST Slab:</span>
+                                    <select id="taxRate" onchange="updateReceipt()" class="flex-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-700 text-xs font-bold outline-none focus:border-slate-500 transition-colors text-white">
+                                        <option value="0">0% (Inclusive)</option>
+                                        <option value="5" selected>5% Apparel</option>
+                                        <option value="12">12% Apparel</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Payment & Totals Summary -->
+                            <div class="bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50 flex flex-col justify-center">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-bold text-slate-400 uppercase">Payment Mode</span>
+                                    <select id="paymentMode" onchange="updateReceipt()" class="bg-slate-900 border border-slate-700 px-3 py-1 rounded-lg text-xs font-bold outline-none text-white">
+                                        <option value="CASH">Cash</option>
+                                        <option value="UPI">UPI / QR</option>
+                                        <option value="CARD">Card</option>
+                                        <option value="SPLIT">Split (Cash+UPI)</option>
+                                    </select>
+                                </div>
+                                <div class="flex justify-between items-end border-t border-slate-700 pt-2 mt-1">
+                                    <span class="text-sm font-bold text-slate-300">Net Payable</span>
+                                    <span id="uiGrandTotal" class="text-3xl font-black text-rose-400 tracking-tight">₹0</span>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Tab -->
+                <div id="tabContentInventory" class="hidden space-y-5">
+                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-premium">
+                        <div class="flex justify-between items-center mb-6">
+                            <h2 class="text-lg font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-boxes-stacked text-indigo-500"></i><span>Cloud Inventory</span></h2>
+                            <div class="bg-indigo-950 text-indigo-300 px-3 py-1 rounded-lg text-xs font-bold border border-indigo-800">Total: <span id="invCountTxt">0</span> Items</div>
+                        </div>
+                        
+                        <div class="bg-slate-800/40 p-4 rounded-2xl border border-slate-700 mb-6 grid grid-cols-1 md:grid-cols-12 gap-3">
+                            <div class="md:col-span-3">
+                                <input type="text" id="invSkuInput" placeholder="SKU/Barcode" class="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-xs font-mono outline-none focus:border-indigo-500 text-white">
+                            </div>
+                            <div class="md:col-span-5">
+                                <input type="text" id="invNameInput" placeholder="Product Name" class="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-medium outline-none focus:border-indigo-500 text-white">
+                            </div>
+                            <div class="md:col-span-2">
+                                <input type="number" id="invPriceInput" placeholder="Price ₹" class="w-full px-3 py-2 rounded-xl border border-slate-700 bg-slate-900 text-sm font-mono font-bold outline-none focus:border-indigo-500 text-white">
+                            </div>
+                            <div class="md:col-span-2">
+                                <button onclick="saveInventoryItem()" class="w-full h-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition-colors text-sm">Save Item</button>
+                            </div>
+                        </div>
+
+                        <div class="overflow-x-auto max-h-[500px] rounded-2xl border border-slate-800">
+                            <table class="w-full text-left text-sm whitespace-nowrap">
+                                <thead class="bg-slate-800 sticky top-0 text-[11px] text-slate-400 font-bold uppercase border-b border-slate-700">
+                                    <tr><th class="p-3 pl-4">SKU</th><th class="p-3">Product Name</th><th class="p-3 text-right">Price</th><th class="p-3 text-center">Action</th></tr>
+                                </thead>
+                                <tbody id="inventoryTableBody" class="divide-y divide-slate-800"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Tab -->
+                <div id="tabContentHistory" class="hidden space-y-5">
+                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-premium">
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-lg font-bold text-white flex items-center space-x-2"><i class="fa-solid fa-clock text-amber-500"></i><span>Cloud Bill History</span></h2>
+                            <button onclick="exportToCSV()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition-colors flex items-center space-x-2 border border-slate-700">
+                                <i class="fa-solid fa-file-csv text-emerald-400"></i><span>Export CSV</span>
+                            </button>
+                        </div>
+                        <div id="historyListContainer" class="space-y-3 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar"></div>
+                    </div>
+                </div>
+
+                <!-- Analytics Tab -->
+                <div id="tabContentAnalytics" class="hidden space-y-5">
+                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-premium relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-64 h-64 bg-purple-500/10 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none"></div>
+                        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6 relative z-10">
+                            <div>
+                                <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                                    <i class="fa-solid fa-chart-pie text-purple-400"></i>
+                                    <span>Gemini AI Business Analytics</span>
+                                </h2>
+                                <p class="text-xs text-slate-400 mt-1">Generates smart insights based on your recent cloud sales history.</p>
+                            </div>
+                            <button onclick="generateAIReport()" id="btnGenerateAI" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-rose-600 text-white text-sm font-bold shadow-lg shadow-purple-500/30 hover:shadow-purple-500/50 transition-all active:scale-95 whitespace-nowrap">
+                                <i class="fa-solid fa-bolt mr-1.5 text-amber-300"></i>Generate Report
+                            </button>
+                        </div>
+                        
+                        <div id="aiLoading" class="hidden py-16 flex flex-col items-center justify-center space-y-4">
+                            <div class="relative w-16 h-16">
+                                <div class="absolute inset-0 border-4 border-slate-800 rounded-full"></div>
+                                <div class="absolute inset-0 border-4 border-purple-500 rounded-full border-t-transparent animate-spin"></div>
+                                <i class="fa-solid fa-wand-magic-sparkles absolute inset-0 flex items-center justify-center text-purple-400 text-lg animate-pulse"></i>
+                            </div>
+                            <p class="text-sm font-bold text-slate-400 animate-pulse">Analyzing sales data & identifying trends...</p>
+                        </div>
+                        
+                        <div id="aiReportContainer" class="hidden p-6 rounded-2xl bg-slate-800/50 border border-slate-700 text-sm leading-relaxed text-slate-300 shadow-inner prose prose-invert max-w-none">
+                            <!-- Report injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div id="tabContentSettings" class="hidden space-y-5">
+                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-premium">
+                        <div class="flex items-center justify-between mb-6 border-b border-slate-800 pb-4">
+                            <h2 class="text-lg font-bold text-white flex items-center space-x-2">
+                                <i class="fa-solid fa-store text-emerald-500"></i><span>Store Settings (Cloud Synced)</span>
+                            </h2>
+                            <button onclick="saveStoreSettings()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-md shadow-emerald-500/20 transition-all">Save to Cloud</button>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">Store Name</label>
+                                <input type="text" id="storeName" placeholder="Store Name" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm font-bold outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">Contact Number</label>
+                                <input type="text" id="storePhone" placeholder="Phone" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                            <div class="space-y-1 md:col-span-2">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">Store Address (Location)</label>
+                                <input type="text" id="storeAddress" placeholder="e.g., Main Market Road, City, State" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">Email / Gmail</label>
+                                <input type="email" id="storeEmail" placeholder="e.g., store@gmail.com" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">GSTIN (Optional)</label>
+                                <input type="text" id="storeGstin" placeholder="e.g., 22AAAAA0000A1Z5" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm uppercase outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                            <div class="space-y-1 md:col-span-2">
+                                <label class="text-xs font-bold text-purple-400 uppercase pl-1"><i class="fa-brands fa-alipay mr-1"></i>Custom UPI ID (For Receipt QR Code)</label>
+                                <input type="text" id="storeUpiId" placeholder="e.g. 9876543210@ybl" class="w-full px-4 py-2.5 rounded-xl border-2 border-purple-800/50 bg-purple-950/10 text-sm font-mono font-bold outline-none focus:border-purple-500 transition-colors text-white">
+                                <p class="text-[10px] text-slate-400 px-1 mt-1">Enter your custom UPI ID here. The system will automatically generate a scannable QR code on the final receipt.</p>
+                            </div>
+                            <div class="space-y-1 md:col-span-2">
+                                <label class="text-xs font-bold text-slate-400 uppercase pl-1">UPI Payee Name</label>
+                                <input type="text" id="storeUpiPayeeName" placeholder="Registered Banking Name" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
+                            </div>
+                        </div>
+
+                        <!-- System Update Section -->
+                        <div class="mt-8 p-5 rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white flex flex-col md:flex-row justify-between items-center gap-4 border border-slate-700 shadow-xl">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-12 h-12 rounded-full bg-slate-700/50 border border-slate-600 flex items-center justify-center">
+                                    <i class="fa-brands fa-android text-2xl text-emerald-400"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-sm">System OS & Updates</h3>
+                                    <p class="text-[11px] text-slate-400">Current Build: v2.1.0 PRO (Stable)</p>
+                                </div>
+                            </div>
+                            <button onclick="checkForUpdates()" class="w-full md:w-auto px-5 py-2.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2">
+                                <i class="fa-solid fa-rotate text-emerald-400"></i><span>Check for Updates</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT COLUMN: Receipt Preview & Print Actions -->
+            <div class="xl:col-span-4 space-y-5 xl:sticky xl:top-24">
+                
+                <!-- Master Actions -->
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-premium space-y-3 no-print relative overflow-hidden">
+                    <div class="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none"></div>
+                    <button onclick="expressFastPrintAndNext()" class="w-full py-4 px-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-sm shadow-lg shadow-emerald-500/30 transition-all active:scale-[0.98] flex items-center justify-center space-x-2 border border-emerald-400/50">
+                        <i class="fa-solid fa-bolt text-lg text-yellow-300"></i><span>FAST PRINT & NEXT (F9)</span>
+                    </button>
+                    <button onclick="smartPrintReceipt()" class="w-full py-3 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shadow-md transition-all active:scale-[0.98] border border-slate-700">
+                        <i class="fa-solid fa-print mr-2 text-slate-300"></i>PRINT BILL NOW
+                    </button>
+                </div>
+
+                <!-- Live Preview -->
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 shadow-premium">
+                    <div class="flex justify-between items-center mb-4 no-print border-b border-slate-800 pb-2">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Live Preview</span>
+                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                    </div>
+
+                    <div id="printableReceiptWrapper" class="flex justify-center bg-slate-950 p-4 rounded-2xl overflow-x-auto border border-slate-800">
+                        <!-- Thermal Paper Look -->
+                        <div id="receiptPreviewPaper" class="receipt-paper w-[290px] bg-white text-black p-4 font-mono text-[11px] leading-snug receipt-shadow transition-all duration-300 relative">
+                            <div class="text-center space-y-0.5 pb-2 border-b border-dashed border-black">
+                                <div id="prevStoreName" class="font-bold text-base uppercase pt-1">STORE NAME</div>
+                                <div id="prevStoreAddress" class="text-[9px] font-medium hidden"></div>
+                                <div id="prevStoreEmail" class="text-[9px] hidden"></div>
+                                <div id="prevStorePhone" class="text-[10px]">Ph: </div>
+                                <div id="prevStoreGstin" class="text-[10px] font-bold hidden mt-1 border border-black inline-block px-1 rounded-sm"></div>
+                            </div>
+                            <div class="py-2 border-b border-dashed border-black text-[10px] space-y-1 flex justify-between font-bold">
+                                <span>BILL: <span id="prevInvNo"></span></span>
+                                <span id="prevDate"></span>
+                            </div>
+                            <div id="prevCustomerSection" class="py-1 border-b border-dashed border-black text-[10px] hidden">
+                                <div class="flex justify-between"><span>Cust: <span id="prevCustName"></span></span><span id="prevCustPhone"></span></div>
+                            </div>
+                            <div class="py-1 border-b border-dashed border-black font-bold text-[10px] flex justify-between bg-gray-50/50">
+                                <span class="w-1/2">ITEM</span><span class="w-1/6 text-center">QTY</span><span class="w-1/6 text-right">RATE</span><span class="w-1/6 text-right">AMT</span>
+                            </div>
+                            <div id="prevItemsList" class="py-1.5 border-b border-dashed border-black space-y-1.5 text-[10.5px]"></div>
+                            
+                            <div class="py-2 border-b border-dashed border-black space-y-0.5 text-[10px]">
+                                <div id="prevDiscountRow" class="flex justify-between font-bold hidden">
+                                    <span>Discount:</span><span id="prevDiscountAmt">-₹0.00</span>
+                                </div>
+                                <div id="prevTaxRow" class="flex justify-between hidden">
+                                    <span>GST Included:</span><span id="prevTaxAmt">₹0.00</span>
+                                </div>
+                                <div class="flex justify-between font-bold text-sm pt-1 mt-1 border-t border-black">
+                                    <span>NET PAYABLE:</span><span id="prevTotal">₹0.00</span>
+                                </div>
+                                <div class="flex justify-between text-[9px] pt-1 font-bold text-gray-700">
+                                    <span>Mode: <span id="prevPaymentMode"></span></span>
+                                    <span>Items: <span id="prevTotalQty">0</span></span>
+                                </div>
+                            </div>
+                            
+                            <!-- Premium QR Section -->
+                            <div id="prevQRSection" class="py-3 border-b border-dashed border-black text-center flex flex-col items-center justify-center space-y-1">
+                                <div class="font-bold text-[11px] bg-black text-white px-2 py-0.5 rounded-full inline-block mb-1 tracking-widest uppercase">UPI Accepted</div>
+                                <div class="p-1.5 bg-white border-2 border-black rounded-lg shadow-sm" id="qrcodeContainer"></div>
+                                <div id="prevUpiIdText" class="text-[8px] font-mono mt-1"></div>
+                            </div>
+                            <div class="pt-3 text-center text-[9px] font-bold uppercase tracking-widest space-y-1">
+                                <div>Thank You! Visit Again</div>
+                                <div class="font-mono text-[7px] text-gray-500">POWERED BY BHUMIKA COLLECTION</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, onSnapshot, addDoc, query, orderBy, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'bhumika-pos-cloud';
+        const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+        
+        let app, db, auth, userId = null;
+        let unsubscribeInventory = null, unsubscribeHistory = null;
+
+        window.currentRole = 'admin';
+        window.cartItems = [];
+        window.inventoryItems = [];
+        window.billHistory = [];
+        window.heldBills = [];
+        window.activeConnection = null;
+        window.paperWidth = 58;
+        
+        const DEFAULT_INVENTORY = [
+            { sku: 'BC-101', name: 'Banarasi Silk Saree', price: 1850 },
+            { sku: 'BC-201', name: 'Kurti Pant Dupatta Set', price: 950 },
+            { sku: 'BC-301', name: 'Mens Cotton Formal Shirt', price: 699 },
+            { sku: 'BC-401', name: 'Designer Partywear Gown', price: 2450 },
+            { sku: 'BC-501', name: 'Kids Fancy Frock', price: 550 },
+            { sku: 'BC-601', name: 'Mens Denim Jeans', price: 899 }
+        ];
+
+        async function initCloudSync() {
+            try {
+                const config = JSON.parse(firebaseConfigStr);
+                if (!config.projectId) {
+                    window.inventoryItems = [...DEFAULT_INVENTORY];
+                    renderInventoryTable();
+                    renderQuickItems();
+                    return;
+                }
+                
+                app = initializeApp(config);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    const userCred = await signInWithCustomToken(auth, __initial_auth_token);
+                    userId = userCred.user.uid;
+                } else {
+                    const userCred = await signInAnonymously(auth);
+                    userId = userCred.user.uid;
+                }
+                if(!userId) return;
+
+                const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
+                const sDoc = await getDoc(settingsRef);
+                if(sDoc.exists()) {
+                    const s = sDoc.data();
+                    if(s.name) document.getElementById('storeName').value = s.name;
+                    if(s.phone) document.getElementById('storePhone').value = s.phone;
+                    if(s.address) document.getElementById('storeAddress').value = s.address;
+                    if(s.email) document.getElementById('storeEmail').value = s.email;
+                    if(s.gstin) document.getElementById('storeGstin').value = s.gstin;
+                    if(s.upiId) document.getElementById('storeUpiId').value = s.upiId;
+                    if(s.upiName) document.getElementById('storeUpiPayeeName').value = s.upiName;
+                } else {
+                    document.getElementById('storeName').value = "BHUMIKA COLLECTION";
+                    document.getElementById('storePhone').value = "9876543210";
+                    document.getElementById('storeUpiId').value = "8817921734-2@ibl";
+                }
+                updateReceipt();
+
+                const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
+                unsubscribeInventory = onSnapshot(invRef, (snapshot) => {
+                    window.inventoryItems = [];
+                    snapshot.forEach(doc => {
+                        window.inventoryItems.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    if(window.inventoryItems.length === 0 && snapshot.metadata.hasPendingWrites === false) {
+                        DEFAULT_INVENTORY.forEach(item => addDoc(invRef, item));
+                    }
+                    renderInventoryTable();
+                    renderQuickItems();
+                }, (err) => console.error(err));
+
+                const histRef = collection(db, 'artifacts', appId, 'users', userId, 'history');
+                unsubscribeHistory = onSnapshot(histRef, (snapshot) => {
+                    window.billHistory = [];
+                    snapshot.forEach(doc => {
+                        window.billHistory.push({ id: doc.id, ...doc.data() });
+                    });
+                    window.billHistory.sort((a,b) => b.timestamp - a.timestamp);
+                    renderHistoryList();
+                    
+                    if(window.billHistory.length > 0) {
+                        const lastBill = window.billHistory[0].invNo;
+                        const match = lastBill.match(/^(.*?)(\d+)$/);
+                        if (match) document.getElementById('invoiceNoInput').value = `${match[1]}${parseInt(match[2], 10) + 1}`;
+                    }
+                }, (err) => console.error(err));
+
+            } catch (e) {
+                window.inventoryItems = [...DEFAULT_INVENTORY];
+                renderInventoryTable();
+                renderQuickItems();
+            }
+        }
+
+        window.handleRoleSwitchClick = () => {
+            if(window.currentRole === 'admin') {
+                setRole('cashier');
+            } else {
+                document.getElementById('pinModal').classList.remove('hidden');
+                setTimeout(() => document.getElementById('adminPinInput').focus(), 100);
+            }
+        };
+
+        window.closePinModal = () => {
+            document.getElementById('pinModal').classList.add('hidden');
+            document.getElementById('adminPinInput').value = '';
+        };
+
+        window.verifyAdminPin = () => {
+            const pin = document.getElementById('adminPinInput').value;
+            if(pin === '1234') {
+                setRole('admin');
+                closePinModal();
+            } else {
+                showToast('Incorrect PIN. Access Denied.', 'error');
+                document.getElementById('adminPinInput').value = '';
+            }
+        };
+
+        window.setRole = (role) => {
+            window.currentRole = role;
+            const display = document.getElementById('currentRoleDisplay');
+            const icon = document.getElementById('roleIcon');
+            const adminEls = document.querySelectorAll('.admin-only');
+            
+            if(role === 'cashier') {
+                display.innerText = 'Cashier';
+                icon.className = 'fa-solid fa-user text-[10px]';
+                adminEls.forEach(el => el.classList.add('hidden'));
+                switchTab('pos');
+                showToast('Locked: Switched to Cashier Mode.', 'info');
+            } else {
+                display.innerText = 'Admin';
+                icon.className = 'fa-solid fa-user-shield text-[10px]';
+                adminEls.forEach(el => el.classList.remove('hidden'));
+                showToast('Unlocked: Admin Mode Active.', 'success');
+            }
+        };
+
+        window.checkForUpdates = () => {
+            const modal = document.getElementById('updateModal');
+            const status = document.getElementById('updateStatusText');
+            const progress = document.getElementById('updateProgressBar');
+            const spinner = document.getElementById('updateSpinner');
+            const icon = document.getElementById('updateIcon');
+
+            modal.classList.remove('hidden');
+            icon.classList.add('hidden');
+            spinner.classList.remove('hidden');
+            status.innerText = 'Connecting to server...';
+            progress.style.width = '10%';
+            
+            setTimeout(() => {
+                status.innerText = 'Downloading v2.2.0 Engine Update...';
+                progress.style.width = '45%';
+                setTimeout(() => {
+                    status.innerText = 'Installing system patches...';
+                    progress.style.width = '85%';
+                    setTimeout(() => {
+                        progress.style.width = '100%';
+                        spinner.classList.add('hidden');
+                        icon.classList.remove('hidden');
+                        icon.className = 'fa-solid fa-circle-check text-3xl text-emerald-500';
+                        status.innerText = 'System is Up to Date!';
+                        status.classList.add('text-emerald-400');
+                        setTimeout(() => { 
+                            modal.classList.add('hidden'); 
+                            showToast('System Updated Successfully!');
+                            setTimeout(()=>{
+                                progress.style.width = '0%';
+                                status.innerText = 'Initializing connection...';
+                                status.classList.remove('text-emerald-400');
+                                icon.className = 'fa-solid fa-cloud-arrow-down text-3xl';
+                            }, 500);
+                        }, 2000);
+                    }, 1500);
+                }, 2000);
+            }, 1500);
+        };
+
+        window.holdCurrentBill = () => {
+            if(window.cartItems.length === 0) return showToast('Cannot hold an empty bill.', 'error');
+            const name = document.getElementById('custName').value || 'Customer #' + (window.heldBills.length + 1);
+            
+            window.heldBills.push({
+                id: Date.now(),
+                name: name,
+                items: [...window.cartItems],
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+            });
+            
+            clearCart();
+            showToast(`Bill for ${name} put on hold.`, 'info');
+        };
+
+        window.showHeldBills = () => {
+            const list = document.getElementById('heldBillsList');
+            list.innerHTML = '';
+            if(window.heldBills.length === 0) {
+                list.innerHTML = '<p class="text-center text-slate-400 text-sm py-4">No bills currently on hold.</p>';
+            } else {
+                window.heldBills.forEach((b, idx) => {
+                    list.innerHTML += `
+                    <div class="flex items-center justify-between p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                        <div>
+                            <div class="font-bold text-sm text-white">${b.name}</div>
+                            <div class="text-[10px] text-slate-400">${b.items.length} items • Held at ${b.time}</div>
+                        </div>
+                        <button onclick="recallBill(${idx})" class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg shadow-sm">Recall</button>
+                    </div>`;
+                });
+            }
+            document.getElementById('heldBillsModal').classList.remove('hidden');
+        };
+
+        window.closeHeldBillsModal = () => document.getElementById('heldBillsModal').classList.add('hidden');
+
+        window.recallBill = (idx) => {
+            const b = window.heldBills[idx];
+            if(!b) return;
+            if(window.cartItems.length > 0) {
+                window.holdCurrentBill();
+            }
+            window.cartItems = [...b.items];
+            document.getElementById('custName').value = b.name.includes('Customer #') ? '' : b.name;
+            window.heldBills.splice(idx, 1);
+            closeHeldBillsModal();
+            updateReceipt();
+            showToast(`Recalled bill for ${b.name}`);
+        };
+
+        window.checkLoyalty = () => {
+            const phone = document.getElementById('custPhone').value.trim();
+            const badge = document.getElementById('loyaltyBadge');
+            if(phone.length === 10) {
+                const pts = (parseInt(phone.slice(-3)) || 0) * 2 + 150; 
+                badge.innerHTML = `<i class="fa-solid fa-crown text-amber-400"></i> <span class="font-bold text-amber-300">${pts} Pts</span>`;
+                badge.classList.remove('hidden');
+                updateReceipt();
+            } else {
+                badge.classList.add('hidden');
+            }
+        };
+
+        window.renderQuickItems = () => {
+            const grid = document.getElementById('quickItemsGrid');
+            if(!grid) return;
+            grid.innerHTML = '';
+            const topItems = window.inventoryItems.slice(0, 6);
+            topItems.forEach(item => {
+                grid.innerHTML += `
+                <div onclick="document.getElementById('newItemName').value='${item.name}'; window.addItem();" 
+                     class="flex-shrink-0 w-32 p-3 bg-slate-900 border border-slate-800 rounded-xl cursor-pointer hover:border-rose-500 hover:shadow-md transition-all active:scale-95 group">
+                    <div class="text-[10px] text-slate-500 font-mono mb-1 truncate">${item.sku || 'SKU'}</div>
+                    <div class="text-xs font-bold text-slate-200 leading-tight mb-2 h-8 line-clamp-2">${item.name}</div>
+                    <div class="text-xs font-black text-rose-400">₹${item.price}</div>
+                </div>`;
+            });
+        };
+
+        window.saveStoreSettings = async () => {
+            if(!db || !userId) return;
+            const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
+            await setDoc(settingsRef, {
+                name: document.getElementById('storeName').value,
+                phone: document.getElementById('storePhone').value,
+                address: document.getElementById('storeAddress').value,
+                email: document.getElementById('storeEmail').value,
+                gstin: document.getElementById('storeGstin').value,
+                upiId: document.getElementById('storeUpiId').value,
+                upiName: document.getElementById('storeUpiPayeeName').value
+            });
+            updateReceipt();
+            showToast('Settings Saved to Cloud!');
+        };
+
+        window.saveInventoryItem = async () => {
+            if(!db || !userId) return;
+            const sku = document.getElementById('invSkuInput').value.trim();
+            const name = document.getElementById('invNameInput').value.trim();
+            const price = parseFloat(document.getElementById('invPriceInput').value);
+            if(!name || isNaN(price)) { showToast('Invalid details', 'error'); return; }
+
+            const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
+            await addDoc(invRef, { sku: sku, name: name, price: price });
+            document.getElementById('invSkuInput').value = '';
+            document.getElementById('invNameInput').value = '';
+            document.getElementById('invPriceInput').value = '';
+            showToast('Saved to Cloud Inventory');
+        };
+
+        window.saveCurrentBillToHistory = async () => {
+            const totals = calculateBillTotals();
+            const record = {
+                invNo: document.getElementById('invoiceNoInput').value,
+                date: new Date().toLocaleString('en-IN'),
+                timestamp: Date.now(),
+                items: JSON.parse(JSON.stringify(window.cartItems)),
+                grandTotal: totals.grandTotal
+            };
+            if(db && userId) {
+                const histRef = collection(db, 'artifacts', appId, 'users', userId, 'history');
+                await addDoc(histRef, record);
+            } else {
+                window.billHistory.unshift(record);
+                renderHistoryList();
+            }
+        };
+
+        let barcodeBuffer = '';
+        let lastKeyTime = 0;
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'F9') { e.preventDefault(); expressFastPrintAndNext(); return; }
+            
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                const currentTime = Date.now();
+                if (currentTime - lastKeyTime > 50) { barcodeBuffer = ''; }
+                
+                if (e.key === 'Enter' && barcodeBuffer.length >= 3) {
+                    processBarcodeScan(barcodeBuffer);
+                    barcodeBuffer = '';
+                } else if (e.key.length === 1) {
+                    barcodeBuffer += e.key;
+                }
+                lastKeyTime = currentTime;
+            }
+        });
+
+        function processBarcodeScan(scanCode) {
+            const query = scanCode.toLowerCase();
+            const matchedItem = window.inventoryItems.find(i => 
+                (i.sku && i.sku.toLowerCase() === query) || i.name.toLowerCase() === query
+            );
+            if (matchedItem) {
+                const existingIndex = window.cartItems.findIndex(i => i.name === matchedItem.name);
+                if (existingIndex > -1) { window.cartItems[existingIndex].qty += 1; } 
+                else { window.cartItems.push({ name: matchedItem.name, qty: 1, price: matchedItem.price }); }
+                updateReceipt();
+                showToast(`Scanned: ${matchedItem.name}`, 'success');
+            } else {
+                showToast(`Barcode ${scanCode} not found`, 'error');
+            }
+        }
+
+        window.handleProductSearchInput = (rawQuery) => {
+            const query = (rawQuery || '').trim().toLowerCase();
+            const dropdown = document.getElementById('searchAutocompleteDropdown');
+            if (query.length === 0) { dropdown.classList.add('hidden'); return; }
+
+            const matches = window.inventoryItems.filter(item => 
+                item.name.toLowerCase().includes(query) || (item.sku || '').toLowerCase().includes(query)
+            );
+
+            if(matches.length > 0) {
+                dropdown.innerHTML = '';
+                matches.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'px-4 py-3 cursor-pointer hover:bg-rose-950/20 rounded-xl flex justify-between items-center transition-colors mb-1';
+                    row.innerHTML = `
+                        <div>
+                            <div class="font-bold text-sm text-slate-200">${item.name}</div>
+                            <div class="text-[10px] text-slate-400 font-mono">${item.sku || 'N/A'}</div>
+                        </div>
+                        <span class="text-rose-400 font-bold text-sm">₹${item.price}</span>`;
+                    row.onmousedown = () => {
+                        document.getElementById('newItemName').value = item.name;
+                        document.getElementById('newItemPrice').value = item.price;
+                        dropdown.classList.add('hidden');
+                        addItem();
+                    };
+                    dropdown.appendChild(row);
+                });
+                dropdown.classList.remove('hidden');
+            } else {
+                dropdown.classList.add('hidden');
+            }
+        };
+
+        window.handleSearchKeydown = (event) => {
+            const dropdown = document.getElementById('searchAutocompleteDropdown');
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                addItem();
+            } else if (event.key === 'Escape') {
+                if (dropdown) dropdown.classList.add('hidden');
+            }
+        };
+        
+        window.addItem = () => {
+            const name = document.getElementById('newItemName').value.trim();
+            const qty = parseInt(document.getElementById('newItemQty').value) || 1;
+            let price = parseFloat(document.getElementById('newItemPrice').value);
+            
+            if(isNaN(price) && name) {
+                const matched = window.inventoryItems.find(i => i.name.toLowerCase() === name.toLowerCase() || (i.sku && i.sku.toLowerCase() === name.toLowerCase()));
+                if(matched) price = matched.price;
+            }
+
+            if (!name || isNaN(price)) { showToast('Enter valid product/price', 'error'); return; }
+
+            const existingItem = window.inventoryItems.find(i => i.name.toLowerCase() === name.toLowerCase());
+            if (!existingItem) {
+                const newSku = 'AUTO-' + Math.floor(1000 + Math.random() * 9000);
+                if (db && userId) {
+                    const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
+                    addDoc(invRef, { sku: newSku, name: name, price: price });
+                    showToast(`Auto-saved "${name}" to Cloud Inventory!`, 'info');
+                } else {
+                    window.inventoryItems.push({ sku: newSku, name: name, price: price });
+                    renderInventoryTable();
+                    renderQuickItems();
+                }
+            }
+
+            window.cartItems.push({ name, qty, price });
+            document.getElementById('newItemName').value = '';
+            document.getElementById('newItemPrice').value = '';
+            document.getElementById('searchAutocompleteDropdown').classList.add('hidden');
+            updateReceipt();
+        };
+
+        window.clearCart = () => { window.cartItems = []; updateReceipt(); };
+        window.removeItem = (idx) => { window.cartItems.splice(idx, 1); updateReceipt(); };
+        window.updateItemQty = (idx, val) => { window.cartItems[idx].qty = parseInt(val) || 1; updateReceipt(); };
+        window.updateItemPrice = (idx, val) => { window.cartItems[idx].price = parseFloat(val) || 0; updateReceipt(); };
+
+        function calculateBillTotals() {
+            let subtotal = 0, totalQty = 0;
+            window.cartItems.forEach(item => { subtotal += item.qty * item.price; totalQty += item.qty; });
+            
+            const discInput = parseFloat(document.getElementById('discountValue').value) || 0;
+            const discType = document.getElementById('discountType').value;
+            let discount = discType === 'percent' ? (subtotal * discInput) / 100 : discInput;
+            
+            const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+            const taxable = subtotal - discount;
+            const taxAmt = (taxable * taxRate / 100);
+            const grandTotal = Math.round(taxable + taxAmt);
+            return { subtotal, totalQty, discount, taxAmt, grandTotal };
+        }
+
+        window.updateReceipt = () => {
+            document.getElementById('prevStoreName').innerText = document.getElementById('storeName').value || 'STORE';
+            document.getElementById('prevStorePhone').innerText = 'Ph: ' + document.getElementById('storePhone').value;
+            
+            const address = document.getElementById('storeAddress') ? document.getElementById('storeAddress').value.trim() : '';
+            const email = document.getElementById('storeEmail') ? document.getElementById('storeEmail').value.trim() : '';
+            const gstin = document.getElementById('storeGstin') ? document.getElementById('storeGstin').value.trim() : '';
+            
+            const prevAddress = document.getElementById('prevStoreAddress');
+            if(address) { prevAddress.innerText = address; prevAddress.classList.remove('hidden'); }
+            else prevAddress.classList.add('hidden');
+            
+            const prevEmail = document.getElementById('prevStoreEmail');
+            if(email) { prevEmail.innerText = `Email: ${email}`; prevEmail.classList.remove('hidden'); }
+            else prevEmail.classList.add('hidden');
+
+            const prevGstin = document.getElementById('prevStoreGstin');
+            if(gstin) { prevGstin.innerText = `GSTIN: ${gstin}`; prevGstin.classList.remove('hidden'); }
+            else prevGstin.classList.add('hidden');
+
+            document.getElementById('prevInvNo').innerText = document.getElementById('invoiceNoInput').value;
+            document.getElementById('prevDate').innerText = new Date().toLocaleDateString('en-IN');
+            
+            const custName = document.getElementById('custName').value.trim();
+            const custPhone = document.getElementById('custPhone').value.trim();
+            if(custName || custPhone) {
+                document.getElementById('prevCustomerSection').classList.remove('hidden');
+                document.getElementById('prevCustName').innerText = custName || 'Walk-in';
+                document.getElementById('prevCustPhone').innerText = custPhone ? `M:${custPhone}` : '';
+            } else {
+                document.getElementById('prevCustomerSection').classList.add('hidden');
+            }
+
+            const tbody = document.getElementById('itemsTableBody');
+            const prevItems = document.getElementById('prevItemsList');
+            tbody.innerHTML = ''; prevItems.innerHTML = '';
+            
+            window.cartItems.forEach((item, idx) => {
+                const tot = item.qty * item.price;
+                tbody.innerHTML += `
+                <tr class="hover:bg-slate-800/50 transition-colors group">
+                    <td class="p-3 pl-4 font-bold text-slate-200">${item.name}</td>
+                    <td class="p-3 text-center"><input type="number" min="1" value="${item.qty}" onchange="updateItemQty(${idx}, this.value)" class="w-12 text-center bg-transparent border-b border-dashed border-slate-600 focus:border-rose-500 outline-none font-bold text-white"></td>
+                    <td class="p-3 text-right"><input type="number" min="0" value="${item.price}" onchange="updateItemPrice(${idx}, this.value)" class="w-16 text-right bg-transparent border-b border-dashed border-slate-600 focus:border-rose-500 outline-none font-mono text-white"></td>
+                    <td class="p-3 pr-4 text-right font-black text-rose-400">₹${tot.toFixed(0)}</td>
+                    <td class="p-3 text-center"><button onclick="removeItem(${idx})" class="text-slate-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-circle-xmark"></i></button></td>
+                </tr>`;
+                
+                prevItems.innerHTML += `<div class="flex justify-between items-start">
+                    <span class="w-1/2 pr-1 break-words">${item.name}</span>
+                    <span class="w-1/6 text-center">${item.qty}</span>
+                    <span class="w-1/6 text-right">${item.price}</span>
+                    <span class="w-1/6 text-right font-bold">${tot}</span>
+                </div>`;
+            });
+            
+            const totals = calculateBillTotals();
+            document.getElementById('uiGrandTotal').innerText = `₹${totals.grandTotal}`;
+            document.getElementById('prevTotal').innerText = `₹${totals.grandTotal.toFixed(2)}`;
+            document.getElementById('prevTotalQty').innerText = totals.totalQty;
+            document.getElementById('prevPaymentMode').innerText = document.getElementById('paymentMode').value;
+
+            if(totals.discount > 0) {
+                document.getElementById('prevDiscountRow').classList.remove('hidden');
+                document.getElementById('prevDiscountAmt').innerText = `-₹${totals.discount.toFixed(2)}`;
+            } else {
+                document.getElementById('prevDiscountRow').classList.add('hidden');
+            }
+
+            if(totals.taxAmt > 0) {
+                document.getElementById('prevTaxRow').classList.remove('hidden');
+                document.getElementById('prevTaxAmt').innerText = `₹${totals.taxAmt.toFixed(2)}`;
+            } else {
+                document.getElementById('prevTaxRow').classList.add('hidden');
+            }
+
+            const qrContainer = document.getElementById('qrcodeContainer');
+            qrContainer.innerHTML = '';
+            const upiId = document.getElementById('storeUpiId').value;
+            if(upiId && totals.grandTotal > 0 && ['UPI', 'SPLIT'].includes(document.getElementById('paymentMode').value)) {
+                document.getElementById('prevQRSection').classList.remove('hidden');
+                document.getElementById('prevUpiIdText').innerText = upiId;
+                const uri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(document.getElementById('storeUpiPayeeName').value)}&am=${totals.grandTotal}&cu=INR`;
+                new QRCode(qrContainer, { text: uri, width: 120, height: 120, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.M });
+            } else {
+                document.getElementById('prevQRSection').classList.add('hidden');
+            }
+        };
+
+        window.renderInventoryTable = () => {
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = '';
+            document.getElementById('invCountTxt').innerText = window.inventoryItems.length;
+            window.inventoryItems.forEach(item => {
+                tbody.innerHTML += `
+                <tr class="hover:bg-slate-800/50">
+                    <td class="p-3 pl-4 font-mono text-xs text-slate-400">${item.sku || '-'}</td>
+                    <td class="p-3 font-bold text-slate-200">${item.name}</td>
+                    <td class="p-3 font-bold text-right text-rose-400">₹${item.price}</td>
+                    <td class="p-3 text-center"><button class="text-slate-400 hover:text-rose-400"><i class="fa-solid fa-trash text-xs"></i></button></td>
+                </tr>`;
+            });
+        };
+
+        window.renderHistoryList = () => {
+            const container = document.getElementById('historyListContainer');
+            container.innerHTML = '';
+            window.billHistory.forEach(bill => {
+                container.innerHTML += `
+                <div class="p-4 rounded-2xl border border-slate-800 bg-slate-800/40 flex justify-between items-center transition-all hover:shadow-md">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-sm text-white">${bill.invNo}</span>
+                            <span class="text-[10px] px-2 py-0.5 bg-indigo-950 text-indigo-300 rounded font-bold">${bill.paymentMode || 'CASH'}</span>
+                        </div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">${bill.date}</div>
+                    </div>
+                    <div class="font-black text-lg text-emerald-400">₹${bill.grandTotal}</div>
+                </div>`;
+            });
+        };
+
+        window.exportToCSV = () => {
+            if(window.billHistory.length === 0) { showToast('No history to export'); return; }
+            let csv = "Invoice No,Date,Total Amount,Payment Mode,Items\n";
+            window.billHistory.forEach(b => {
+                const itemsStr = b.items.map(i => `${i.qty}x ${i.name}`).join('; ');
+                csv += `${b.invNo},"${b.date}",${b.grandTotal},${b.paymentMode || 'CASH'},"${itemsStr}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'Bhumika_Cloud_Sales_Export.csv');
+            a.click();
+        };
+
+        window.generateAIReport = async () => {
+            const container = document.getElementById('aiReportContainer');
+            const loading = document.getElementById('aiLoading');
+            const btn = document.getElementById('btnGenerateAI');
+            
+            if(window.billHistory.length === 0) { showToast('Not enough sales data for AI analysis.'); return; }
+
+            container.classList.add('hidden');
+            loading.classList.remove('hidden');
+            btn.disabled = true;
+
+            const salesSummary = window.billHistory.map(b => ({
+                date: b.date, total: b.grandTotal, items: b.items.map(i=>i.name)
+            }));
+
+            const payload = {
+                contents: [{ parts: [{ text: `You are an expert retail analyst. Analyze this POS sales data for 'Bhumika Collection'. Data: ${JSON.stringify(salesSummary.slice(0,50))}. Provide a concise 2-paragraph HTML formatted summary of sales trends, best-selling items, and 1 actionable recommendation for the store owner. Use bolding.` }] }],
+                systemInstruction: { parts: [{ text: "Act as a world-class financial analyst. Return ONLY safe HTML formatting (p, b, ul, li)." }] },
+            };
+
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=`;
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                const result = await response.json();
+                
+                let text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if(text) {
+                    container.innerHTML = text.replace(/```html|```/g, ''); 
+                    container.classList.remove('hidden');
+                } else { throw new Error("Empty AI response"); }
+            } catch(e) {
+                container.innerHTML = `<p class="text-rose-400 font-bold">Failed to generate AI report. Check connection.</p>`;
+                container.classList.remove('hidden');
+            }
+            loading.classList.add('hidden');
+            btn.disabled = false;
+        };
+
+        window.switchTab = (tab) => {
+            ['pos', 'inventory', 'history', 'analytics', 'settings'].forEach(t => {
+                const el = document.getElementById(`tabContent${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (el) el.classList.add('hidden');
+                const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+                if (btn) btn.className = btn.className.replace('bg-slate-900 text-rose-400 shadow-sm', 'text-slate-400 hover:text-white hover:bg-slate-900/50');
+            });
+            document.getElementById(`tabContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tabBtn${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+            if (activeBtn) activeBtn.className = activeBtn.className.replace('text-slate-400 hover:text-white hover:bg-slate-900/50', 'bg-slate-900 text-rose-400 shadow-sm');
+        };
+
+        window.showToast = (msg, type='success') => {
+            const c = document.getElementById('toastContainer');
+            const bg = type==='success'?'bg-emerald-600':(type==='info'?'bg-indigo-600':'bg-rose-600');
+            const t = document.createElement('div');
+            t.className = `flex items-center space-x-2 px-5 py-3 rounded-2xl text-white text-sm font-bold shadow-xl shadow-slate-950/40 transition-all transform duration-300 scale-95 opacity-0 ${bg}`;
+            t.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${msg}</span>`;
+            c.appendChild(t);
+            setTimeout(() => { t.classList.remove('scale-95', 'opacity-0'); t.classList.add('scale-100', 'opacity-100'); }, 10);
+            setTimeout(() => { t.classList.remove('scale-100', 'opacity-100'); t.classList.add('scale-95', 'opacity-0'); setTimeout(()=>t.remove(), 300); }, 3000);
+        };
+
+        window.expressFastPrintAndNext = async () => {
+            if(window.cartItems.length===0){ showToast('Cart empty', 'error'); return; }
+            await smartPrintReceipt();
+            window.clearCart();
+            const match = document.getElementById('invoiceNoInput').value.match(/^(.*?)(\d+)$/);
+            if (match) document.getElementById('invoiceNoInput').value = `${match[1]}${parseInt(match[2], 10) + 1}`;
+            document.getElementById('custName').value = '';
+            document.getElementById('custPhone').value = '';
+            document.getElementById('loyaltyBadge').classList.add('hidden');
+            document.getElementById('newItemName').focus();
+        };
+
+        window.smartPrintReceipt = async () => {
+            if(window.cartItems.length===0) return;
+            await saveCurrentBillToHistory();
+            window.print(); 
+        };
+        window.systemDriverPrint = window.smartPrintReceipt;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initCloudSync();
+        });
+    </script>
+</body>
+</html>
