@@ -55,33 +55,31 @@
             background-size: 12px 24px;
         }
 
-        /* 203 DPI Thermal Printer Optimization: Pure 1-bit monochrome sharpness, zero gray dithering */
+        /* Vector Font Optimization: Ensures text stays razor-sharp when zooming in on screens */
         .receipt-paper, .receipt-paper * {
             font-family: 'Courier Prime', 'Courier New', Courier, monospace !important;
             color: #000000 !important;
-            -webkit-font-smoothing: none !important;
-            -moz-osx-font-smoothing: unset !important;
-            font-smooth: never !important;
-            text-rendering: geometricPrecision !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            text-rendering: optimizeLegibility !important;
             letter-spacing: -0.2px;
+            box-sizing: border-box !important;
         }
 
-        /* Double-strike ink density mode for ultra-dark thermal output */
+        .receipt-paper {
+            flex-shrink: 0 !important; /* Prevents the receipt from stretching or squishing */
+        }
+
         .thermal-dark-burn .font-bold {
             font-weight: 700 !important;
-            text-shadow: 0.2px 0 0 #000000 !important;
         }
 
         /* Prevent any QR code or canvas pixel stretching / bilinear blur */
-        .receipt-paper img, .receipt-paper canvas, #modalReceiptClone img, #modalReceiptClone canvas {
+        .receipt-paper img, #modalReceiptClone img {
             image-rendering: -moz-crisp-edges !important;
             image-rendering: -webkit-optimize-contrast !important;
             image-rendering: crisp-edges !important;
             image-rendering: pixelated !important;
-        }
-
-        /* Fix double-stacked QR optical illusion and resize to be smaller */
-        #qrcodeContainer img, #modalReceiptClone img {
             width: 80px !important;
             height: 80px !important;
             max-width: none !important;
@@ -89,8 +87,13 @@
             margin: 0 auto !important;
         }
 
-        /* Exact 203 DPI Printable Widths (Reduced 58mm printable width to 44mm to prevent edge cutoff) */
-        .paper-58mm { width: 44mm !important; max-width: 44mm !important; margin: 0 auto !important; }
+        /* Hide the hidden canvas that causes the double-stacked QR illusion */
+        .receipt-paper canvas, #modalReceiptClone canvas {
+            display: none !important;
+        }
+
+        /* Exact 203 DPI Printable Widths */
+        .paper-58mm { width: 48mm !important; max-width: 48mm !important; margin: 0 auto !important; }
         .paper-80mm { width: 72mm !important; max-width: 72mm !important; margin: 0 auto !important; }
 
         /* Custom Scrollbar */
@@ -187,7 +190,8 @@
             <div class="flex-1 overflow-y-auto bg-slate-950/90 border border-slate-800 rounded-2xl p-6 flex justify-center items-start custom-scrollbar">
                 <div id="modalReceiptClone" class="bg-white text-black p-3 receipt-shadow"></div>
             </div>
-        /* Print Confirmation Buttons */
+            
+            <!-- Print Confirmation Buttons -->
             <div class="pt-4 mt-3 border-t border-slate-800 grid grid-cols-2 gap-3">
                 <button onclick="closeThermalPreviewModal()" class="py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors">
                     Back to Edit
@@ -350,7 +354,7 @@
                             <div class="flex items-center space-x-3">
                                 <div class="px-3 py-1.5 bg-slate-800 rounded-xl border border-slate-700 flex items-center space-x-2">
                                     <span class="text-xs font-medium text-slate-400">Bill No:</span>
-                                    <input type="text" id="invoiceNoInput" value="BC-1001" oninput="updateReceipt()" class="w-20 bg-transparent text-xs font-bold font-mono outline-none text-white">
+                                    <input type="text" id="invoiceNoInput" value="BC-001" oninput="updateReceipt()" class="w-20 bg-transparent text-xs font-bold font-mono outline-none text-white">
                                 </div>
                             </div>
                             <div class="flex items-center space-x-2">
@@ -439,7 +443,7 @@
                                 <div class="flex justify-between items-center mb-2">
                                     <span class="text-xs font-bold text-slate-400 uppercase">Payment Mode</span>
                                     <select id="paymentMode" onchange="updateReceipt()" class="bg-slate-900 border border-slate-700 px-3 py-1 rounded-lg text-xs font-bold outline-none text-white">
-                                        <option value="UPI" selected>UPI / Paytm QR</option>
+                                        <option value="UPI / Paytm QR" selected>UPI / Paytm QR</option>
                                         <option value="CASH">Cash</option>
                                         <option value="CARD">Card</option>
                                         <option value="SPLIT">Split (Cash+UPI)</option>
@@ -549,7 +553,7 @@
                             </div>
                             <div class="space-y-1">
                                 <label class="text-xs font-bold text-slate-400 uppercase pl-1">Contact Number</label>
-                                <input type="text" id="storePhone" value="9876543210" oninput="updateReceipt()" placeholder="Phone" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
+                                <input type="text" id="storePhone" value="98765 43210" oninput="updateReceipt()" placeholder="Phone" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm outline-none focus:border-emerald-500 transition-colors text-white">
                             </div>
                             <div class="space-y-1 md:col-span-2">
                                 <label class="text-xs font-bold text-slate-400 uppercase pl-1">Store Address (Location)</label>
@@ -561,12 +565,12 @@
                             </div>
                             <div class="space-y-1">
                                 <label class="text-xs font-bold text-slate-400 uppercase pl-1">GSTIN (Optional)</label>
-                                <input type="text" id="storeGstin" oninput="updateReceipt()" placeholder="e.g., 22AAAAA0000A1Z5" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm uppercase outline-none focus:border-emerald-500 transition-colors text-white">
+                                <input type="text" id="storeGstin" value="23AABCB1234F1Z5" oninput="updateReceipt()" placeholder="e.g., 23AABCB1234F1Z5" class="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-sm uppercase outline-none focus:border-emerald-500 transition-colors text-white">
                             </div>
                             <div class="space-y-1 md:col-span-2">
                                 <label class="text-xs font-bold text-purple-400 uppercase pl-1"><i class="fa-solid fa-qrcode mr-1"></i>Paytm / UPI ID (For Receipt QR Code)</label>
                                 <input type="text" id="storeUpiId" value="paytm.s19rghm@pty" oninput="updateReceipt()" placeholder="e.g. paytm.s19rghm@pty" class="w-full px-4 py-2.5 rounded-xl border-2 border-purple-800/50 bg-purple-950/10 text-sm font-mono font-bold outline-none focus:border-purple-500 transition-colors text-white">
-                                <p class="text-[10px] text-slate-400 px-1 mt-1">Configured with your Paytm Business QR account (<span class="text-purple-300 font-mono">paytm.s19rghm@pty</span>).</p>
+                                <p class="text-[10px] text-slate-400 px-1 mt-1">Configured with your Business QR account.</p>
                             </div>
                             <div class="space-y-1 md:col-span-2">
                                 <label class="text-xs font-bold text-slate-400 uppercase pl-1">UPI Payee Name</label>
@@ -582,7 +586,7 @@
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-sm">System OS & Thermal Driver</h3>
-                                    <p class="text-[11px] text-slate-400">Build: v2.4.0 Thermal-Pro (203 DPI Pixel-Lock)</p>
+                                    <p class="text-[11px] text-slate-400">Build: v2.5.0 Matrix-Pro (203 DPI Pixel-Lock)</p>
                                 </div>
                             </div>
                             <button onclick="checkForUpdates()" class="w-full md:w-auto px-5 py-2.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2">
@@ -623,71 +627,83 @@
                     </div>
 
                     <div id="printableReceiptWrapper" class="flex justify-center bg-slate-950 p-4 rounded-2xl overflow-x-auto border border-slate-800">
-                        <!-- Thermal Paper Look (Locked to exact millimeter width & high contrast monochrome) -->
-                        <div id="receiptPreviewPaper" class="receipt-paper paper-58mm thermal-dark-burn bg-white text-black p-2.5 font-mono text-[11px] leading-tight receipt-shadow relative">
+                        <!-- Thermal Paper Look (Locked to exact millimeter width, thin Matrix font weights) -->
+                        <div id="receiptPreviewPaper" class="receipt-paper paper-58mm thermal-dark-burn bg-white text-black p-2 font-mono text-[9px] leading-tight receipt-shadow relative">
                             
                             <!-- Store Header -->
-                            <div class="text-center space-y-0.5 pb-2 border-b-2 border-dashed border-black">
-                                <div id="prevStoreName" class="font-bold text-[15px] uppercase tracking-tight leading-none pt-0.5">BHUMIKA COLLECTION</div>
-                                <div id="prevStoreAddress" class="text-[10px] leading-tight font-normal">Main Market Road, Near City Center</div>
-                                <div id="prevStoreEmail" class="text-[9px] hidden font-normal"></div>
-                                <div class="text-[10px]"><span class="font-bold">Ph:</span> <span id="prevStorePhone" class="font-normal">9876543210</span></div>
-                                <div id="prevStoreGstin" class="text-[10px] font-normal hidden mt-1 border border-black inline-block px-1"></div>
+                            <div class="text-center space-y-1 pb-2 border-b border-dashed border-black">
+                                <div id="prevStoreName" class="font-bold text-[14px] uppercase tracking-tighter leading-none pt-1">BHUMIKA COLLECTION</div>
+                                <div class="text-[8.5px] font-normal uppercase leading-tight">Exclusive Ladies, Gents & Kids Wear</div>
+                                <div id="prevStoreAddress" class="text-[8.5px] leading-tight font-normal">Main Market Road, Near City Center</div>
+                                <div id="prevStoreEmail" class="text-[8.5px] hidden"></div>
+                                <div class="text-[8.5px] font-normal mt-0.5">Ph: <span id="prevStorePhone">98765 43210</span></div>
+                                <div id="prevStoreGstin" class="text-[8.5px] font-normal mt-0.5 uppercase">GSTIN: 23AABCB1234F1Z5</div>
                             </div>
 
                             <!-- Invoice Metadata -->
-                            <div class="py-1.5 border-b-2 border-dashed border-black text-[10px] flex justify-between">
-                                <span><span class="font-bold">BILL NO:</span> <span id="prevInvNo" class="font-normal">BC-1001</span></span>
-                                <span id="prevDate" class="font-normal"></span>
-                            </div>
-
-                            <!-- Customer Metadata -->
-                            <div id="prevCustomerSection" class="py-1 border-b-2 border-dashed border-black text-[10px] hidden">
-                                <div class="flex justify-between">
-                                    <span class="truncate pr-1"><span class="font-bold">Cust:</span> <span id="prevCustName" class="font-normal"></span></span>
-                                    <span id="prevCustPhone" class="font-normal"></span>
+                            <div class="py-1.5 border-b border-dashed border-black text-[8.5px] font-normal flex flex-col space-y-1">
+                                <div class="flex justify-between items-center gap-1">
+                                    <span class="truncate">BILL: <span id="prevInvNo">BC-001</span></span>
+                                    <span id="prevDate" class="whitespace-nowrap text-right">21/10/2026 10:01 pm</span>
+                                </div>
+                                <div class="flex justify-between items-center gap-1">
+                                    <span class="truncate pr-1">Cust: <span id="prevCustName">BITTI GADHI</span></span>
+                                    <span class="whitespace-nowrap text-right">Mob: <span id="prevCustPhone">6266169168</span></span>
+                                </div>
+                                <div class="flex justify-between items-center gap-1">
+                                    <span class="truncate pr-1">Mode: <span id="prevPaymentMode">UPI / Paytm QR</span></span>
+                                    <span class="whitespace-nowrap text-right">Total Qty: <span id="prevTotalQty">1</span></span>
                                 </div>
                             </div>
 
                             <!-- Table Header -->
-                            <div class="py-1 border-b-2 border-black font-bold text-[10px] flex justify-between">
-                                <span class="w-[46%]">ITEM</span>
-                                <span class="w-[14%] text-center">QTY</span>
-                                <span class="w-[20%] text-right">RATE</span>
-                                <span class="w-[20%] text-right">AMT</span>
+                            <div class="py-1 border-b border-dashed border-black font-normal text-[8.5px] flex justify-between uppercase">
+                                <span class="w-[46%]">Item</span>
+                                <span class="w-[14%] text-center">Qty</span>
+                                <span class="w-[20%] text-right">Rate</span>
+                                <span class="w-[20%] text-right">Amt</span>
                             </div>
 
-                            <!-- Line Items -->
-                            <div id="prevItemsList" class="py-1.5 border-b-2 border-dashed border-black space-y-1.5 text-[10.5px]"></div>
+                            <!-- Line Items (Normal Font Weight) -->
+                            <div id="prevItemsList" class="py-1.5 border-b border-dashed border-black space-y-1 text-[8.5px] font-normal"></div>
                             
                             <!-- Totals & Summary -->
-                            <div class="py-1.5 border-b-2 border-dashed border-black space-y-0.5 text-[10.5px]">
+                            <div class="py-1.5 border-b border-dashed border-black space-y-1 text-[9px] font-normal">
+                                <div class="flex justify-between">
+                                    <span>Gross Subtotal:</span><span id="prevSubtotal">₹0.00</span>
+                                </div>
                                 <div id="prevDiscountRow" class="flex justify-between hidden">
-                                    <span class="font-bold">Discount:</span><span id="prevDiscountAmt" class="font-normal">-₹0.00</span>
+                                    <span>Discount:</span><span id="prevDiscountAmt">-₹0.00</span>
                                 </div>
                                 <div id="prevTaxRow" class="flex justify-between hidden">
-                                    <span class="font-bold">GST Included:</span><span id="prevTaxAmt" class="font-normal">₹0.00</span>
+                                    <span>GST Included:</span><span id="prevTaxAmt">₹0.00</span>
                                 </div>
-                                <div class="flex justify-between font-bold text-[13px] pt-1 mt-1 border-t-2 border-black">
+                                <div class="flex justify-between font-bold text-[11.5px] pt-1 mt-1 border-t border-black uppercase">
                                     <span>NET PAYABLE:</span><span id="prevTotal">₹0.00</span>
                                 </div>
-                                <div class="flex justify-between text-[9.5px] pt-1">
-                                    <span><span class="font-bold">MODE:</span> <span id="prevPaymentMode" class="font-normal">UPI</span></span>
-                                    <span><span class="font-bold">ITEMS:</span> <span id="prevTotalQty" class="font-normal">0</span></span>
+                                <div id="savingsBanner" class="text-center text-[8px] uppercase border border-black p-0.5 mt-1 hidden">
+                                    ★ You Saved <span id="savedAmount">₹0.00</span> on this bill! ★
                                 </div>
                             </div>
                             
-                            <!-- Crisp Integer-Locked Paytm QR Section -->
-                            <div id="prevQRSection" class="py-2.5 border-b-2 border-dashed border-black text-center flex flex-col items-center justify-center space-y-1">
-                                <div class="font-bold text-[10px] px-2 py-0.5 uppercase tracking-wider">SCAN & PAY</div>
-                                <div class="p-1 bg-white inline-block my-1" id="qrcodeContainer"></div>
-                                <div class="text-[9.5px] font-mono tracking-tight"><span class="font-bold">UPI ID:</span> <span id="prevUpiIdText" class="font-normal">paytm.s19rghm@pty</span></div>
+                            <!-- Crisp Integer-Locked QR Section -->
+                            <div id="prevQRSection" class="py-2 border-b border-dashed border-black text-center flex flex-col items-center justify-center space-y-1.5">
+                                <div class="font-bold text-[9px] uppercase">Paytm</div>
+                                <div class="text-[7.5px] uppercase font-bold tracking-widest leading-none">ACCEPTED HERE</div>
+                                <div class="text-[7.5px] font-normal">Scan & Pay</div>
+                                
+                                <!-- QR Container Size matches exact CSS pixels, no border box -->
+                                <div class="p-0.5 bg-white inline-block mt-1 relative" id="qrcodeContainer"></div>
+                                
+                                <div id="prevUpiPayeeText" class="text-[7.5px] font-normal uppercase leading-tight pt-1">BHUMIKA COLLECTION</div>
+                                <div id="prevUpiIdText" class="text-[8px] font-normal uppercase tracking-tight">UPI ID: paytm.s19rghm@pty</div>
                             </div>
 
                             <!-- Footer -->
-                            <div class="pt-2.5 pb-1 text-center text-[9.5px] space-y-0.5 font-normal">
-                                <div class="font-bold">* THANK YOU! VISIT AGAIN *</div>
-                                <div class="text-[8px]">NO CASH REFUND • EXCHANGE IN 3 DAYS</div>
+                            <div class="pt-2 pb-1 text-center text-[8px] font-normal uppercase space-y-1">
+                                <div>Exchange within 7 days with tag & bill only.</div>
+                                <div>THANK YOU FOR SHOPPING AT BHUMIKA COLLECTION!</div>
+                                <div class="pt-1">*** VISIT AGAIN ***</div>
                             </div>
                         </div>
                     </div>
@@ -725,8 +741,7 @@
 
         // Pre-load sample items so the user can immediately see the crisp thermal receipt & QR preview
         window.cartItems = [
-            { name: 'Banarasi Silk Saree', qty: 1, price: 1850 },
-            { name: 'Kurti Pant Dupatta Set', qty: 1, price: 950 }
+            { name: 'MUH SUNDAR BANANE WALA', qty: 1, price: 1000 }
         ];
 
         async function initCloudSync() {
@@ -762,12 +777,11 @@
                     if(s.address) document.getElementById('storeAddress').value = s.address;
                     if(s.email) document.getElementById('storeEmail').value = s.email;
                     if(s.gstin) document.getElementById('storeGstin').value = s.gstin;
-                    // Ensure Paytm QR account is set
                     document.getElementById('storeUpiId').value = s.upiId || "paytm.s19rghm@pty";
                     if(s.upiName) document.getElementById('storeUpiPayeeName').value = s.upiName;
                 } else {
                     document.getElementById('storeName').value = "BHUMIKA COLLECTION";
-                    document.getElementById('storePhone').value = "9876543210";
+                    document.getElementById('storePhone').value = "98765 43210";
                     document.getElementById('storeUpiId').value = "paytm.s19rghm@pty";
                     document.getElementById('storeUpiPayeeName').value = "BHUMIKA COLLECTION";
                 }
@@ -860,15 +874,6 @@
             if (!source || !target) return;
             target.className = source.className;
             target.innerHTML = source.innerHTML;
-            
-            // Copy canvas pixels if QR code rendered as canvas
-            const srcCanvas = source.querySelector('canvas');
-            const destCanvas = target.querySelector('canvas');
-            if (srcCanvas && destCanvas) {
-                const ctx = destCanvas.getContext('2d');
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(srcCanvas, 0, 0);
-            }
         }
 
         window.openThermalPreviewModal = () => {
@@ -888,10 +893,13 @@
 
         window.loadDemoSampleItems = () => {
             window.cartItems = [
-                { name: 'Banarasi Silk Saree', qty: 1, price: 1850 },
-                { name: 'Kurti Pant Dupatta Set', qty: 2, price: 950 }
+                { name: 'MUH SUNDAR BANANE WALA', qty: 1, price: 1000 }
             ];
-            document.getElementById('paymentMode').value = 'UPI';
+            document.getElementById('paymentMode').value = 'UPI / Paytm QR';
+            document.getElementById('discountValue').value = 15;
+            document.getElementById('discountType').value = 'percent';
+            document.getElementById('custName').value = 'BITTI GADHI';
+            document.getElementById('custPhone').value = '6266169168';
             updateReceipt();
             showToast('Sample Bill Loaded for Thermal Preview!');
         };
@@ -962,7 +970,7 @@
                     spinner.classList.add('hidden');
                     icon.classList.remove('hidden');
                     icon.className = 'fa-solid fa-circle-check text-3xl text-emerald-500';
-                    status.innerText = 'Thermal Engine Optimized & Up to Date!';
+                    status.innerText = 'Matrix Engine Optimized & Up to Date!';
                     status.classList.add('text-emerald-400');
                     setTimeout(() => { 
                         modal.classList.add('hidden'); 
@@ -1245,7 +1253,8 @@
 
         window.updateReceipt = () => {
             document.getElementById('prevStoreName').innerText = document.getElementById('storeName').value || 'BHUMIKA COLLECTION';
-            document.getElementById('prevStorePhone').innerText = (document.getElementById('storePhone').value || '9876543210');
+            const phoneVal = document.getElementById('storePhone').value || '98765 43210';
+            document.getElementById('prevStorePhone').innerText = phoneVal;
             
             const address = document.getElementById('storeAddress') ? document.getElementById('storeAddress').value.trim() : '';
             const email = document.getElementById('storeEmail') ? document.getElementById('storeEmail').value.trim() : '';
@@ -1264,17 +1273,16 @@
             else prevGstin.classList.add('hidden');
 
             document.getElementById('prevInvNo').innerText = document.getElementById('invoiceNoInput').value;
-            document.getElementById('prevDate').innerText = new Date().toLocaleDateString('en-IN');
+            
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-GB'); 
+            const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).toLowerCase();
+            document.getElementById('prevDate').innerText = `${dateStr} ${timeStr}`;
             
             const custName = document.getElementById('custName').value.trim();
             const custPhone = document.getElementById('custPhone').value.trim();
-            if(custName || custPhone) {
-                document.getElementById('prevCustomerSection').classList.remove('hidden');
-                document.getElementById('prevCustName').innerText = custName || 'Walk-in';
-                document.getElementById('prevCustPhone').innerText = custPhone ? `M:${custPhone}` : '';
-            } else {
-                document.getElementById('prevCustomerSection').classList.add('hidden');
-            }
+            document.getElementById('prevCustName').innerText = custName || 'Walk-in';
+            document.getElementById('prevCustPhone').innerText = custPhone || 'N/A';
 
             const tbody = document.getElementById('itemsTableBody');
             const prevItems = document.getElementById('prevItemsList');
@@ -1295,7 +1303,7 @@
                         <td class="p-3 text-center"><button onclick="removeItem(${idx})" class="text-slate-500 hover:text-rose-400 transition-colors"><i class="fa-solid fa-circle-xmark"></i></button></td>
                     </tr>`;
                     
-                    prevItems.innerHTML += `<div class="flex justify-between items-start leading-tight font-normal">
+                    prevItems.innerHTML += `<div class="flex justify-between items-start leading-tight">
                         <span class="w-[46%] pr-1 break-words">${item.name}</span>
                         <span class="w-[14%] text-center">${item.qty}</span>
                         <span class="w-[20%] text-right">${item.price}</span>
@@ -1306,6 +1314,8 @@
             
             const totals = calculateBillTotals();
             document.getElementById('uiGrandTotal').innerText = `₹${totals.grandTotal}`;
+            
+            document.getElementById('prevSubtotal').innerText = `₹${totals.subtotal.toFixed(2)}`;
             document.getElementById('prevTotal').innerText = `₹${totals.grandTotal.toFixed(2)}`;
             document.getElementById('prevTotalQty').innerText = totals.totalQty;
             document.getElementById('prevPaymentMode').innerText = document.getElementById('paymentMode').value;
@@ -1313,8 +1323,11 @@
             if(totals.discount > 0) {
                 document.getElementById('prevDiscountRow').classList.remove('hidden');
                 document.getElementById('prevDiscountAmt').innerText = `-₹${totals.discount.toFixed(2)}`;
+                document.getElementById('savingsBanner').classList.remove('hidden');
+                document.getElementById('savedAmount').innerText = `₹${totals.discount.toFixed(2)}`;
             } else {
                 document.getElementById('prevDiscountRow').classList.add('hidden');
+                document.getElementById('savingsBanner').classList.add('hidden');
             }
 
             if(totals.taxAmt > 0) {
@@ -1324,15 +1337,16 @@
                 document.getElementById('prevTaxRow').classList.add('hidden');
             }
 
-            // Generate 1:1 integer-scaled 80x80 QR Code for razor-sharp 203 DPI thermal printing
+            // Generate 1:1 integer-scaled 80x80 QR Code
             const qrContainer = document.getElementById('qrcodeContainer');
             qrContainer.innerHTML = '';
             const upiId = document.getElementById('storeUpiId').value.trim() || 'paytm.s19rghm@pty';
             const payeeName = document.getElementById('storeUpiPayeeName').value.trim() || 'BHUMIKA COLLECTION';
             
-            if(upiId && ['UPI', 'SPLIT'].includes(document.getElementById('paymentMode').value)) {
+            if(upiId && ['UPI / Paytm QR', 'SPLIT', 'UPI'].includes(document.getElementById('paymentMode').value)) {
                 document.getElementById('prevQRSection').classList.remove('hidden');
-                document.getElementById('prevUpiIdText').innerText = upiId;
+                document.getElementById('prevUpiIdText').innerText = `UPI ID: ${upiId}`;
+                document.getElementById('prevUpiPayeeText').innerText = payeeName;
                 const amountParam = totals.grandTotal > 0 ? `&am=${totals.grandTotal}` : '';
                 const uri = `upi://pay?pa=${upiId}&pn=${encodeURIComponent(payeeName)}${amountParam}&cu=INR`;
                 new QRCode(qrContainer, { 
@@ -1343,6 +1357,16 @@
                     colorLight: "#ffffff", 
                     correctLevel: QRCode.CorrectLevel.L 
                 });
+                
+                // CRITICAL FIX: Explicitly remove the canvas after the image is generated 
+                // to guarantee absolutely no double-overlay on thermal prints.
+                setTimeout(() => {
+                    const canvas = qrContainer.querySelector('canvas');
+                    if(canvas) {
+                        canvas.remove();
+                    }
+                }, 50);
+
             } else {
                 document.getElementById('prevQRSection').classList.add('hidden');
             }
