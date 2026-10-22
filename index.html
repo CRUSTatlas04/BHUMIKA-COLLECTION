@@ -740,6 +740,52 @@
             { sku: 'BC-601', name: 'Mens Denim Jeans', price: 899 }
         ];
 
+        // Local Storage Fallback for offline usage
+        function loadLocalFallback() {
+            const savedSettings = localStorage.getItem('bhumika_pos_settings');
+            if (savedSettings) {
+                const s = JSON.parse(savedSettings);
+                if(s.name) document.getElementById('storeName').value = s.name;
+                if(s.phone) document.getElementById('storePhone').value = s.phone;
+                if(s.address) document.getElementById('storeAddress').value = s.address;
+                if(s.email) document.getElementById('storeEmail').value = s.email;
+                if(s.gstin) document.getElementById('storeGstin').value = s.gstin;
+                if(s.upiId) document.getElementById('storeUpiId').value = s.upiId;
+                if(s.upiName) document.getElementById('storeUpiPayeeName').value = s.upiName;
+                if(s.paperWidth) {
+                    document.getElementById('paperWidthSelect').value = s.paperWidth;
+                    window.changePaperSize(true);
+                }
+                if(s.darkBurnEnabled !== undefined) {
+                    document.getElementById('darkBurnCheckbox').checked = s.darkBurnEnabled;
+                    document.getElementById('modalDarkBurnToggle').checked = s.darkBurnEnabled;
+                    window.toggleDarkBurn(s.darkBurnEnabled, true);
+                }
+            } else {
+                document.getElementById('storeName').value = "BHUMIKA COLLECTION";
+                document.getElementById('storePhone').value = "9876543210";
+                document.getElementById('storeUpiId').value = "paytm.s19rghm@pty";
+                document.getElementById('storeUpiPayeeName').value = "BHUMIKA COLLECTION";
+            }
+            
+            const savedInv = localStorage.getItem('bhumika_pos_inventory');
+            window.inventoryItems = savedInv ? JSON.parse(savedInv) : [...DEFAULT_INVENTORY];
+            renderInventoryTable();
+            renderQuickItems();
+
+            const savedHist = localStorage.getItem('bhumika_pos_history');
+            if (savedHist) {
+                window.billHistory = JSON.parse(savedHist);
+                if(window.billHistory.length > 0) {
+                    const lastBill = window.billHistory[0].invNo;
+                    const match = lastBill.match(/^(.*?)(\d+)$/);
+                    if (match) document.getElementById('invoiceNoInput').value = `${match[1]}${parseInt(match[2], 10) + 1}`;
+                }
+            }
+            renderHistoryList();
+            updateReceipt();
+        }
+
         // Pre-load sample items so the user can immediately see the crisp thermal receipt & QR preview
         window.cartItems = [
             { name: 'MUH SUNDAR BANANE WALA', qty: 1, price: 1000 }
@@ -749,10 +795,7 @@
             try {
                 const config = JSON.parse(firebaseConfigStr);
                 if (!config.projectId) {
-                    window.inventoryItems = [...DEFAULT_INVENTORY];
-                    renderInventoryTable();
-                    renderQuickItems();
-                    updateReceipt();
+                    loadLocalFallback();
                     return;
                 }
                 
@@ -830,10 +873,7 @@
                 }, (err) => console.error(err));
 
             } catch (e) {
-                window.inventoryItems = [...DEFAULT_INVENTORY];
-                renderInventoryTable();
-                renderQuickItems();
-                updateReceipt();
+                loadLocalFallback();
             }
         }
 
@@ -1085,12 +1125,7 @@
         window.saveStoreSettings = async (silentMode = false) => {
             const isSilent = silentMode === true;
             updateReceipt();
-            if(!db || !userId) {
-                if(!isSilent) showToast('Settings applied locally (Cloud Sync offline)');
-                return;
-            }
-            const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
-            await setDoc(settingsRef, {
+            const s = {
                 name: document.getElementById('storeName').value,
                 phone: document.getElementById('storePhone').value,
                 address: document.getElementById('storeAddress').value,
@@ -1100,7 +1135,14 @@
                 upiName: document.getElementById('storeUpiPayeeName').value,
                 paperWidth: window.paperWidth,
                 darkBurnEnabled: window.darkBurnEnabled
-            });
+            };
+            if(!db || !userId) {
+                localStorage.setItem('bhumika_pos_settings', JSON.stringify(s));
+                if(!isSilent) showToast('Settings Saved Locally to Browser!');
+                return;
+            }
+            const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
+            await setDoc(settingsRef, s);
             if(!isSilent) showToast('Settings Saved to Cloud!');
         };
 
@@ -1115,6 +1157,7 @@
                 await addDoc(invRef, { sku: sku, name: name, price: price });
             } else {
                 window.inventoryItems.push({ sku, name, price });
+                localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
                 renderInventoryTable();
                 renderQuickItems();
             }
@@ -1139,6 +1182,7 @@
                 await addDoc(histRef, record);
             } else {
                 window.billHistory.unshift(record);
+                localStorage.setItem('bhumika_pos_history', JSON.stringify(window.billHistory));
                 renderHistoryList();
             }
         };
@@ -1242,6 +1286,7 @@
                     addDoc(invRef, { sku: newSku, name: name, price: price });
                 } else {
                     window.inventoryItems.push({ sku: newSku, name: name, price: price });
+                    localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
                     renderInventoryTable();
                     renderQuickItems();
                 }
