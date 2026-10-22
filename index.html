@@ -8,7 +8,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Bhumika Collection">
     <title>Bhumika Collection - Cloud POS & AI Analytics</title>
-    
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -55,26 +54,24 @@
             background-size: 12px 24px;
         }
 
-        /* Vector Font Optimization: Ensures text stays razor-sharp when zooming in on screens */
+        /* Vector Font Optimization: Sharp scaling at any zoom level with clean thermal hierarchy */
         .receipt-paper, .receipt-paper * {
             font-family: 'Courier Prime', 'Courier New', Courier, monospace !important;
             color: #000000 !important;
-            -webkit-font-smoothing: antialiased !important;
-            -moz-osx-font-smoothing: grayscale !important;
             text-rendering: optimizeLegibility !important;
             letter-spacing: -0.2px;
             box-sizing: border-box !important;
         }
 
         .receipt-paper {
-            flex-shrink: 0 !important; /* Prevents the receipt from stretching or squishing */
+            flex-shrink: 0 !important;
         }
 
         .thermal-dark-burn .font-bold {
             font-weight: 700 !important;
         }
 
-        /* Prevent any QR code or canvas pixel stretching / bilinear blur */
+        /* Prevent QR code pixel stretching */
         .receipt-paper img, #modalReceiptClone img {
             image-rendering: -moz-crisp-edges !important;
             image-rendering: -webkit-optimize-contrast !important;
@@ -87,12 +84,12 @@
             margin: 0 auto !important;
         }
 
-        /* Hide the hidden canvas that causes the double-stacked QR illusion */
+        /* Hide hidden canvas to prevent double QR illusion */
         .receipt-paper canvas, #modalReceiptClone canvas {
             display: none !important;
         }
 
-        /* Exact 203 DPI Printable Widths */
+        /* Exact 47mm Printable Width with side padding to prevent cut-offs */
         .paper-58mm { width: 47mm !important; max-width: 47mm !important; margin: 0 auto !important; padding: 0 1.5mm !important; box-sizing: border-box !important; }
         .paper-80mm { width: 72mm !important; max-width: 72mm !important; margin: 0 auto !important; padding: 0 2.5mm !important; box-sizing: border-box !important; }
 
@@ -101,7 +98,7 @@
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         
-        /* Native Print Engine Rules - Zero stretching, exact millimeter lock */
+        /* Native Print Engine Rules - Zero stretching, exact millimeter lock, perfectly centered */
         @media print {
             html, body { 
                 margin: 0 !important; 
@@ -115,7 +112,6 @@
                 print-color-adjust: exact !important; 
                 zoom: 1 !important;
             }
-            /* Hide everything except the active receipt */
             body * { visibility: hidden !important; }
             .no-print, #thermalPreviewModal, #toastContainer, header { display: none !important; }
             
@@ -155,7 +151,6 @@
     </style>
 </head>
 <body class="h-full bg-slate-950 text-slate-100 font-sans transition-colors duration-200">
-
     <!-- Notification Toast Container -->
     <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-[70] flex flex-col space-y-2 pointer-events-none no-print"></div>
 
@@ -359,7 +354,6 @@
                                 </div>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <button onclick="loadDemoSampleItems()" class="px-3 py-1.5 rounded-lg bg-emerald-950/50 hover:bg-emerald-900/60 text-emerald-400 text-xs font-bold transition-colors border border-emerald-800/40"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Sample Bill</button>
                                 <button onclick="holdCurrentBill()" class="px-3 py-1.5 rounded-lg bg-amber-950/50 hover:bg-amber-900/60 text-amber-400 text-xs font-bold transition-colors border border-amber-800/40"><i class="fa-solid fa-pause mr-1"></i>Hold</button>
                                 <button onclick="showHeldBills()" class="px-3 py-1.5 rounded-lg bg-indigo-950/50 hover:bg-indigo-900/60 text-indigo-400 text-xs font-bold transition-colors border border-indigo-800/40"><i class="fa-solid fa-folder-open mr-1"></i>Recall</button>
                                 <button onclick="clearCart()" class="px-3 py-1.5 rounded-lg bg-rose-950/50 hover:bg-rose-900/60 text-rose-400 text-xs font-bold transition-colors border border-rose-800/40"><i class="fa-solid fa-trash mr-1"></i>Clear</button>
@@ -628,7 +622,7 @@
                     </div>
 
                     <div id="printableReceiptWrapper" class="flex justify-center bg-slate-950 p-4 rounded-2xl overflow-x-auto border border-slate-800">
-                        <!-- Thermal Paper Look (Locked to exact millimeter width, thin Matrix font weights) -->
+                        <!-- Thermal Paper Look -->
                         <div id="receiptPreviewPaper" class="receipt-paper paper-58mm thermal-dark-burn bg-white text-black p-2 font-mono text-[9px] leading-tight receipt-shadow relative">
                             
                             <!-- Store Header -->
@@ -648,12 +642,12 @@
                                     <span id="prevDate" class="whitespace-nowrap text-right">21/10/2026 10:01 pm</span>
                                 </div>
                                 <div class="flex justify-between items-center gap-1">
-                                    <span class="truncate pr-1">Cust: <span id="prevCustName">BITTI GADHI</span></span>
-                                    <span class="whitespace-nowrap text-right">Mob: <span id="prevCustPhone">6266169168</span></span>
+                                    <span class="truncate pr-1">Cust: <span id="prevCustName">Walk-in</span></span>
+                                    <span class="whitespace-nowrap text-right">Mob: <span id="prevCustPhone">N/A</span></span>
                                 </div>
                                 <div class="flex justify-between items-center gap-1">
                                     <span class="truncate pr-1">Mode: <span id="prevPaymentMode">UPI / Paytm QR</span></span>
-                                    <span class="whitespace-nowrap text-right">Total Qty: <span id="prevTotalQty">1</span></span>
+                                    <span class="whitespace-nowrap text-right">Total Qty: <span id="prevTotalQty">0</span></span>
                                 </div>
                             </div>
 
@@ -665,7 +659,7 @@
                                 <span class="w-[20%] text-right">Amt</span>
                             </div>
 
-                            <!-- Line Items (Normal Font Weight) -->
+                            <!-- Line Items -->
                             <div id="prevItemsList" class="py-1.5 border-b border-dashed border-black space-y-1 text-[8.5px] font-normal"></div>
                             
                             <!-- Totals & Summary -->
@@ -687,13 +681,12 @@
                                 </div>
                             </div>
                             
-                            <!-- Crisp Integer-Locked QR Section -->
+                            <!-- QR Section -->
                             <div id="prevQRSection" class="py-2 border-b border-dashed border-black text-center flex flex-col items-center justify-center space-y-1.5">
                                 <div class="font-bold text-[9px] uppercase">Paytm</div>
                                 <div class="text-[7.5px] uppercase font-bold tracking-widest leading-none">ACCEPTED HERE</div>
                                 <div class="text-[7.5px] font-normal">Scan & Pay</div>
                                 
-                                <!-- QR Container Size matches exact CSS pixels, no border box -->
                                 <div class="p-0.5 bg-white inline-block mt-1 relative" id="qrcodeContainer"></div>
                                 
                                 <div id="prevUpiPayeeText" class="text-[7.5px] font-normal uppercase leading-tight pt-1">BHUMIKA COLLECTION</div>
@@ -722,7 +715,6 @@
         const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
         
         let app, db, auth, userId = null;
-        let unsubscribeInventory = null, unsubscribeHistory = null;
 
         window.currentRole = 'admin';
         window.inventoryItems = [];
@@ -740,7 +732,7 @@
             { sku: 'BC-601', name: 'Mens Denim Jeans', price: 899 }
         ];
 
-        // Local Storage Fallback for offline usage
+        // Persistent LocalStorage and Offline Fallback Loader
         function loadLocalFallback() {
             const savedSettings = localStorage.getItem('bhumika_pos_settings');
             if (savedSettings) {
@@ -783,13 +775,11 @@
                 }
             }
             renderHistoryList();
+            
+            // Cart starts completely empty as requested
+            window.cartItems = [];
             updateReceipt();
         }
-
-        // Pre-load sample items so the user can immediately see the crisp thermal receipt & QR preview
-        window.cartItems = [
-            { name: 'MUH SUNDAR BANANE WALA', qty: 1, price: 1000 }
-        ];
 
         async function initCloudSync() {
             try {
@@ -810,7 +800,7 @@
                     const userCred = await signInAnonymously(auth);
                     userId = userCred.user.uid;
                 }
-                if(!userId) return;
+                if(!userId) { loadLocalFallback(); return; }
 
                 const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
                 const sDoc = await getDoc(settingsRef);
@@ -824,15 +814,14 @@
                     document.getElementById('storeUpiId').value = s.upiId || "paytm.s19rghm@pty";
                     if(s.upiName) document.getElementById('storeUpiPayeeName').value = s.upiName;
                     
-                    // Restore Hardware Configuration
                     if(s.paperWidth) {
                         document.getElementById('paperWidthSelect').value = s.paperWidth;
-                        window.changePaperSize(true); // Load silently
+                        window.changePaperSize(true);
                     }
                     if(s.darkBurnEnabled !== undefined) {
                         document.getElementById('darkBurnCheckbox').checked = s.darkBurnEnabled;
                         document.getElementById('modalDarkBurnToggle').checked = s.darkBurnEnabled;
-                        window.toggleDarkBurn(s.darkBurnEnabled, true); // Load silently
+                        window.toggleDarkBurn(s.darkBurnEnabled, true);
                     }
                 } else {
                     document.getElementById('storeName').value = "BHUMIKA COLLECTION";
@@ -840,37 +829,37 @@
                     document.getElementById('storeUpiId').value = "paytm.s19rghm@pty";
                     document.getElementById('storeUpiPayeeName').value = "BHUMIKA COLLECTION";
                 }
+                
+                window.cartItems = [];
                 updateReceipt();
 
                 const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
-                unsubscribeInventory = onSnapshot(invRef, (snapshot) => {
+                onSnapshot(invRef, (snapshot) => {
                     window.inventoryItems = [];
                     snapshot.forEach(doc => {
                         window.inventoryItems.push({ id: doc.id, ...doc.data() });
                     });
-                    
                     if(window.inventoryItems.length === 0 && snapshot.metadata.hasPendingWrites === false) {
                         DEFAULT_INVENTORY.forEach(item => addDoc(invRef, item));
                     }
                     renderInventoryTable();
                     renderQuickItems();
-                }, (err) => console.error(err));
+                }, (err) => loadLocalFallback());
 
                 const histRef = collection(db, 'artifacts', appId, 'users', userId, 'history');
-                unsubscribeHistory = onSnapshot(histRef, (snapshot) => {
+                onSnapshot(histRef, (snapshot) => {
                     window.billHistory = [];
                     snapshot.forEach(doc => {
                         window.billHistory.push({ id: doc.id, ...doc.data() });
                     });
                     window.billHistory.sort((a,b) => b.timestamp - a.timestamp);
                     renderHistoryList();
-                    
                     if(window.billHistory.length > 0) {
                         const lastBill = window.billHistory[0].invNo;
                         const match = lastBill.match(/^(.*?)(\d+)$/);
                         if (match) document.getElementById('invoiceNoInput').value = `${match[1]}${parseInt(match[2], 10) + 1}`;
                     }
-                }, (err) => console.error(err));
+                }, (err) => {});
 
             } catch (e) {
                 loadLocalFallback();
@@ -898,7 +887,7 @@
             updateReceipt();
             
             if (silentLoad !== true) {
-                window.saveStoreSettings(true); // Auto-save to cloud
+                window.saveStoreSettings(true);
                 showToast(`Switched to ${window.paperWidth}mm Thermal Roll`, 'info');
             }
         };
@@ -917,7 +906,7 @@
             syncModalPreviewClone();
             
             if (silentLoad !== true) {
-                window.saveStoreSettings(true); // Auto-save to cloud
+                window.saveStoreSettings(true);
             }
         };
 
@@ -949,19 +938,6 @@
         window.triggerDirectThermalPrint = async () => {
             closeThermalPreviewModal();
             await smartPrintReceipt();
-        };
-
-        window.loadDemoSampleItems = () => {
-            window.cartItems = [
-                { name: 'MUH SUNDAR BANANE WALA', qty: 1, price: 1000 }
-            ];
-            document.getElementById('paymentMode').value = 'UPI / Paytm QR';
-            document.getElementById('discountValue').value = 15;
-            document.getElementById('discountType').value = 'percent';
-            document.getElementById('custName').value = 'BITTI GADHI';
-            document.getElementById('custPhone').value = '6266169168';
-            updateReceipt();
-            showToast('Sample Bill Loaded for Thermal Preview!');
         };
 
         window.handleRoleSwitchClick = () => {
@@ -1123,8 +1099,6 @@
         };
 
         window.saveStoreSettings = async (silentMode = false) => {
-            const isSilent = silentMode === true;
-            updateReceipt();
             const s = {
                 name: document.getElementById('storeName').value,
                 phone: document.getElementById('storePhone').value,
@@ -1136,14 +1110,8 @@
                 paperWidth: window.paperWidth,
                 darkBurnEnabled: window.darkBurnEnabled
             };
-            if(!db || !userId) {
-                localStorage.setItem('bhumika_pos_settings', JSON.stringify(s));
-                if(!isSilent) showToast('Settings Saved Locally to Browser!');
-                return;
-            }
-            const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
-            await setDoc(settingsRef, s);
-            if(!isSilent) showToast('Settings Saved to Cloud!');
+            localStorage.setItem('bhumika_pos_settings', JSON.stringify(s));
+            if(!silentMode) showToast('Settings Saved Successfully!');
         };
 
         window.saveInventoryItem = async () => {
@@ -1152,15 +1120,11 @@
             const price = parseFloat(document.getElementById('invPriceInput').value);
             if(!name || isNaN(price)) { showToast('Invalid details', 'error'); return; }
 
-            if(db && userId) {
-                const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
-                await addDoc(invRef, { sku: sku, name: name, price: price });
-            } else {
-                window.inventoryItems.push({ sku, name, price });
-                localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
-                renderInventoryTable();
-                renderQuickItems();
-            }
+            window.inventoryItems.push({ sku, name, price });
+            localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
+            renderInventoryTable();
+            renderQuickItems();
+
             document.getElementById('invSkuInput').value = '';
             document.getElementById('invNameInput').value = '';
             document.getElementById('invPriceInput').value = '';
@@ -1177,14 +1141,9 @@
                 items: JSON.parse(JSON.stringify(window.cartItems)),
                 grandTotal: totals.grandTotal
             };
-            if(db && userId) {
-                const histRef = collection(db, 'artifacts', appId, 'users', userId, 'history');
-                await addDoc(histRef, record);
-            } else {
-                window.billHistory.unshift(record);
-                localStorage.setItem('bhumika_pos_history', JSON.stringify(window.billHistory));
-                renderHistoryList();
-            }
+            window.billHistory.unshift(record);
+            localStorage.setItem('bhumika_pos_history', JSON.stringify(window.billHistory));
+            renderHistoryList();
         };
 
         let barcodeBuffer = '';
@@ -1281,15 +1240,10 @@
             const existingItem = window.inventoryItems.find(i => i.name.toLowerCase() === name.toLowerCase());
             if (!existingItem) {
                 const newSku = 'AUTO-' + Math.floor(1000 + Math.random() * 9000);
-                if (db && userId) {
-                    const invRef = collection(db, 'artifacts', appId, 'users', userId, 'inventory');
-                    addDoc(invRef, { sku: newSku, name: name, price: price });
-                } else {
-                    window.inventoryItems.push({ sku: newSku, name: name, price: price });
-                    localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
-                    renderInventoryTable();
-                    renderQuickItems();
-                }
+                window.inventoryItems.push({ sku: newSku, name: name, price: price });
+                localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
+                renderInventoryTable();
+                renderQuickItems();
             }
 
             window.cartItems.push({ name, qty, price });
@@ -1405,7 +1359,7 @@
                 document.getElementById('prevTaxRow').classList.add('hidden');
             }
 
-            // Generate 1:1 integer-scaled 80x80 QR Code
+            // QR Code Generation
             const qrContainer = document.getElementById('qrcodeContainer');
             qrContainer.innerHTML = '';
             const upiId = document.getElementById('storeUpiId').value.trim() || 'paytm.s19rghm@pty';
@@ -1426,13 +1380,9 @@
                     correctLevel: QRCode.CorrectLevel.L 
                 });
                 
-                // CRITICAL FIX: Explicitly remove the canvas after the image is generated 
-                // to guarantee absolutely no double-overlay on thermal prints.
                 setTimeout(() => {
                     const canvas = qrContainer.querySelector('canvas');
-                    if(canvas) {
-                        canvas.remove();
-                    }
+                    if(canvas) { canvas.remove(); }
                 }, 50);
 
             } else {
