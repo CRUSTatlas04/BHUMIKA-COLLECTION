@@ -780,9 +780,20 @@
                     if(s.gstin) document.getElementById('storeGstin').value = s.gstin;
                     document.getElementById('storeUpiId').value = s.upiId || "paytm.s19rghm@pty";
                     if(s.upiName) document.getElementById('storeUpiPayeeName').value = s.upiName;
+                    
+                    // Restore Hardware Configuration
+                    if(s.paperWidth) {
+                        document.getElementById('paperWidthSelect').value = s.paperWidth;
+                        window.changePaperSize(true); // Load silently
+                    }
+                    if(s.darkBurnEnabled !== undefined) {
+                        document.getElementById('darkBurnCheckbox').checked = s.darkBurnEnabled;
+                        document.getElementById('modalDarkBurnToggle').checked = s.darkBurnEnabled;
+                        window.toggleDarkBurn(s.darkBurnEnabled, true); // Load silently
+                    }
                 } else {
                     document.getElementById('storeName').value = "BHUMIKA COLLECTION";
-                    document.getElementById('storePhone').value = "98765 43210";
+                    document.getElementById('storePhone').value = "9876543210";
                     document.getElementById('storeUpiId').value = "paytm.s19rghm@pty";
                     document.getElementById('storeUpiPayeeName').value = "BHUMIKA COLLECTION";
                 }
@@ -826,7 +837,7 @@
             }
         }
 
-        window.changePaperSize = () => {
+        window.changePaperSize = (silentLoad = false) => {
             const widthVal = document.getElementById('paperWidthSelect').value;
             window.paperWidth = parseInt(widthVal, 10);
             const paperEl = document.getElementById('receiptPreviewPaper');
@@ -845,10 +856,14 @@
             }
             updateLiveDpiTag();
             updateReceipt();
-            showToast(`Switched to ${window.paperWidth}mm Thermal Roll`, 'info');
+            
+            if (silentLoad !== true) {
+                window.saveStoreSettings(true); // Auto-save to cloud
+                showToast(`Switched to ${window.paperWidth}mm Thermal Roll`, 'info');
+            }
         };
 
-        window.toggleDarkBurn = (enabled) => {
+        window.toggleDarkBurn = (enabled, silentLoad = false) => {
             window.darkBurnEnabled = enabled;
             document.getElementById('darkBurnCheckbox').checked = enabled;
             document.getElementById('modalDarkBurnToggle').checked = enabled;
@@ -860,6 +875,10 @@
             }
             updateLiveDpiTag();
             syncModalPreviewClone();
+            
+            if (silentLoad !== true) {
+                window.saveStoreSettings(true); // Auto-save to cloud
+            }
         };
 
         function updateLiveDpiTag() {
@@ -1063,10 +1082,11 @@
             });
         };
 
-        window.saveStoreSettings = async () => {
+        window.saveStoreSettings = async (silentMode = false) => {
+            const isSilent = silentMode === true;
             updateReceipt();
             if(!db || !userId) {
-                showToast('Settings applied locally!');
+                if(!isSilent) showToast('Settings applied locally (Cloud Sync offline)');
                 return;
             }
             const settingsRef = doc(db, 'artifacts', appId, 'users', userId, 'settings', 'store_settings');
@@ -1077,9 +1097,11 @@
                 email: document.getElementById('storeEmail').value,
                 gstin: document.getElementById('storeGstin').value,
                 upiId: document.getElementById('storeUpiId').value,
-                upiName: document.getElementById('storeUpiPayeeName').value
+                upiName: document.getElementById('storeUpiPayeeName').value,
+                paperWidth: window.paperWidth,
+                darkBurnEnabled: window.darkBurnEnabled
             });
-            showToast('Settings Saved to Cloud!');
+            if(!isSilent) showToast('Settings Saved to Cloud!');
         };
 
         window.saveInventoryItem = async () => {
