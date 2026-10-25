@@ -200,22 +200,27 @@
         </div>
     </div>
 
-    <!-- Admin PIN Modal (SHA-256 Protected + Rate Limited) -->
+    <!-- Admin PIN Modal -->
     <div id="pinModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 no-print transition-opacity">
         <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 shadow-2xl transform transition-transform scale-100">
-            <div class="text-center mb-6">
+            <div class="text-center mb-5">
                 <div class="w-16 h-16 bg-rose-950/60 border border-rose-800/50 rounded-full flex items-center justify-center mx-auto mb-3 text-rose-500">
                     <i class="fa-solid fa-shield-halved text-2xl"></i>
                 </div>
                 <h3 class="text-lg font-bold text-white">Organization Admin Lock</h3>
-                <p class="text-xs text-slate-400 mt-1">Enter 4-digit security PIN to unlock Admin Controls</p>
+                <p class="text-xs text-slate-400 mt-1">Enter 4-digit security PIN (Default: <span class="text-emerald-400 font-mono font-bold">1985</span>)</p>
             </div>
-            <div class="relative mb-5">
+            <div class="relative mb-4">
                 <input type="password" inputmode="numeric" id="adminPinInput" placeholder="••••" maxlength="4" onkeydown="if(event.key==='Enter') verifyAdminPin()" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] px-4 py-3.5 rounded-xl border-2 border-slate-700 bg-slate-950 text-white placeholder-slate-600 focus:border-rose-500 focus:ring-0 outline-none transition-colors font-mono shadow-inner">
             </div>
             <div class="flex space-x-3">
-                <button onclick="closePinModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors">Cancel</button>
-                <button onclick="verifyAdminPin()" class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-glow-rose transition-all">Unlock</button>
+                <button onclick="closePinModal()" class="flex-1 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-bold transition-colors text-sm">Cancel</button>
+                <button onclick="verifyAdminPin()" class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold shadow-glow-rose transition-all text-sm">Unlock</button>
+            </div>
+            <div class="mt-4 pt-3 border-t border-slate-800/80 text-center">
+                <button onclick="forceResetPinToDefault()" class="text-[11px] text-slate-400 hover:text-emerald-400 font-semibold transition-colors">
+                    <i class="fa-solid fa-key mr-1"></i>PIN not working? Click to Reset PIN to 1985 & Unlock
+                </button>
             </div>
         </div>
     </div>
@@ -620,7 +625,7 @@
                                 </div>
                                 <div>
                                     <h3 class="font-bold text-sm">Firebase Cloud Security & Thermal Engine</h3>
-                                    <p class="text-[11px] text-slate-400">Project: <span class="font-mono text-emerald-400">atlas-6e2ca</span> • SHA-256 PIN Guard • IndexedDB Offline Cache</p>
+                                    <p class="text-[11px] text-slate-400">Project: <span class="font-mono text-emerald-400">atlas-6e2ca</span> • Offline+Cloud PIN Guard • IndexedDB Cache</p>
                                 </div>
                             </div>
                             <button onclick="checkForUpdates()" class="w-full md:w-auto px-5 py-2.5 bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-2">
@@ -678,7 +683,7 @@
                             <div class="py-1.5 border-b border-dashed border-black text-[8.5px] font-normal flex flex-col space-y-1">
                                 <div class="flex justify-between items-center gap-1">
                                     <span class="truncate">BILL: <span id="prevInvNo">BC-001</span></span>
-                                    <span id="prevDate" class="whitespace-nowrap text-right">25/10/2026 11:50 am</span>
+                                    <span id="prevDate" class="whitespace-nowrap text-right">25/10/2026 12:27 pm</span>
                                 </div>
                                 <div class="flex justify-between items-center gap-1">
                                     <span class="truncate pr-1">Cust: <span id="prevCustName">Walk-in</span></span>
@@ -779,7 +784,6 @@
             appId: "1:496166312242:web:b93d879b4ac7be8a989f2b"
         };
 
-        // Shared Organization ID so all store terminals sync to the same catalog
         const ORG_ID = "bhumika_collection";
 
         let app, db, auth, currentUser = null;
@@ -794,11 +798,30 @@
         window.paperWidth = 58;
         window.darkBurnEnabled = true;
 
-        // Default SHA-256 Hash for PIN "1985"
-        const DEFAULT_PIN_HASH = "f8638b979b2f4f793ddb6dbd197e0ee25a7a6ea32b0ae22f5e3c5d119d839e75";
+        // Universal Synchronous PIN Hasher (Works on file://, http://, and https:// without failing)
+        function hashPinSync(pin) {
+            const str = "BHUMIKA_SALT_" + String(pin).trim();
+            let h1 = 0xdeadbeef ^ str.length, h2 = 0x41c6ce57 ^ str.length;
+            for (let i = 0, ch; i < str.length; i++) {
+                ch = str.charCodeAt(i);
+                h1 = Math.imul(h1 ^ ch, 2654435761);
+                h2 = Math.imul(h2 ^ ch, 1597334677);
+            }
+            h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+            h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+            return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+        }
+
+        const DEFAULT_PIN_HASH = hashPinSync("1985");
         let failedPinAttempts = 0;
         let pinLockoutUntil = 0;
         let inactivityTimer = null;
+
+        // Clean up any incompatible 64-character SHA-256 hash stored in localStorage from earlier builds
+        const existingStoredHash = localStorage.getItem('bhumika_pos_pin_hash');
+        if (existingStoredHash && existingStoredHash.length !== 16) {
+            localStorage.removeItem('bhumika_pos_pin_hash');
+        }
 
         const DEFAULT_INVENTORY = [
             { id: 'item_bc_101', sku: 'BC-101', name: 'Banarasi Silk Saree', price: 1850 },
@@ -809,7 +832,6 @@
             { id: 'item_bc_601', sku: 'BC-601', name: 'Mens Denim Jeans', price: 899 }
         ];
 
-        // XSS Protection / Safe HTML Escaping
         function escapeHtml(str) {
             return String(str || '')
                 .replace(/&/g, '&amp;')
@@ -819,16 +841,6 @@
                 .replace(/'/g, '&#039;');
         }
 
-        // SHA-256 Cryptographic Hashing for Admin PIN
-        async function sha256Hash(text) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(text);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-        }
-
-        // Auto-lock Admin session after 15 minutes of inactivity
         function resetInactivityWatchdog() {
             if (inactivityTimer) clearTimeout(inactivityTimer);
             inactivityTimer = setTimeout(() => {
@@ -843,7 +855,6 @@
         });
         resetInactivityWatchdog();
 
-        // Update Top Cloud Status Pill
         function setSyncBadge(state, label) {
             const badge = document.getElementById('cloudSyncStatus');
             const dot = document.getElementById('syncDot');
@@ -863,7 +874,6 @@
             }
         }
 
-        // LocalStorage Mirroring (Instant Offline Boot + Zero Data Loss)
         function persistInventoryLocally() {
             try {
                 localStorage.setItem('bhumika_pos_inventory', JSON.stringify(window.inventoryItems));
@@ -900,7 +910,9 @@
             if (s.gstin !== undefined) document.getElementById('storeGstin').value = s.gstin;
             if (s.upiId !== undefined) document.getElementById('storeUpiId').value = s.upiId;
             if (s.upiName !== undefined) document.getElementById('storeUpiPayeeName').value = s.upiName;
-            if (s.pinHash) localStorage.setItem('bhumika_pos_pin_hash', s.pinHash);
+            if (s.pinHash && s.pinHash.length === 16) {
+                localStorage.setItem('bhumika_pos_pin_hash', s.pinHash);
+            }
 
             if (s.paperWidth) {
                 document.getElementById('paperWidthSelect').value = s.paperWidth;
@@ -913,7 +925,6 @@
             }
         }
 
-        // Instant Local Boot
         function loadLocalFallback() {
             try {
                 const savedSettings = localStorage.getItem('bhumika_pos_settings');
@@ -978,14 +989,12 @@
         // ENTERPRISE FIREBASE CLOUD INITIALIZATION & REAL-TIME LISTENERS
         // ============================================================================
         async function initEnterpriseFirebase() {
-            // 1. Load local state immediately so UI is responsive in 0ms
             loadLocalFallback();
 
             try {
                 app = initializeApp(FIREBASE_CONFIG);
                 auth = getAuth(app);
 
-                // Enable IndexedDB Multi-Tab Offline Persistence
                 try {
                     db = initializeFirestore(app, {
                         localCache: persistentLocalCache({
@@ -993,23 +1002,19 @@
                         })
                     });
                 } catch (cacheErr) {
-                    // Fallback if already initialized
                     const { getFirestore } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
                     db = getFirestore(app);
                 }
 
-                // Listen for Authentication state changes
                 onAuthStateChanged(auth, async (user) => {
                     if (user) {
                         currentUser = user;
                         updateAuthUI(user);
                         await startOrganizationListeners();
                     } else {
-                        // Sign in anonymously so terminal has an authenticated session token immediately
                         try {
                             await signInAnonymously(auth);
                         } catch (anonErr) {
-                            console.warn("Anonymous auth disabled or restricted; attempting direct Firestore sync:", anonErr);
                             updateAuthUI(null);
                             await startOrganizationListeners();
                         }
@@ -1037,7 +1042,6 @@
             }
         }
 
-        // Google Login / Logout Handler
         window.handleCloudAuthClick = async () => {
             if (!auth) return showToast('Cloud Auth not initialized', 'error');
 
@@ -1054,18 +1058,15 @@
                 updateAuthUI(currentUser);
                 showToast(`Signed in as ${currentUser.displayName || currentUser.email}`, 'success');
             } catch (err) {
-                console.warn("Google Popup Sign-in error:", err);
                 showToast('Popup blocked or domain not whitelisted in Firebase Auth settings', 'error');
             }
         };
 
-        // Attach Live Listeners to `organizations/bhumika_collection/...`
         async function startOrganizationListeners() {
             if (!db) return;
             setSyncBadge('syncing', 'Syncing atlas-6e2ca...');
 
             try {
-                // 1. Organization Store Settings
                 const settingsRef = doc(db, 'organizations', ORG_ID, 'config', 'store_settings');
                 const sSnap = await getDoc(settingsRef);
                 if (sSnap.exists()) {
@@ -1077,7 +1078,6 @@
                     await window.saveStoreSettings(true);
                 }
 
-                // 2. Real-time Inventory Listener (Smart Bi-Directional Merge)
                 if (unsubscribeInventory) unsubscribeInventory();
                 const invCol = collection(db, 'organizations', ORG_ID, 'inventory');
                 unsubscribeInventory = onSnapshot(invCol, async (snapshot) => {
@@ -1086,12 +1086,10 @@
                         cloudItems.push({ ...docSnap.data(), id: docSnap.id });
                     });
 
-                    // Check if local inventory has items that were deleted on another terminal
                     const deletedIdsJson = sessionStorage.getItem('bhumika_deleted_ids') || '[]';
                     const deletedIds = new Set(JSON.parse(deletedIdsJson));
 
                     if (cloudItems.length === 0) {
-                        // Cloud collection is empty: Push existing local items up to Firestore so they never get wiped!
                         if (window.inventoryItems.length > 0 && !snapshot.metadata.hasPendingWrites) {
                             for (const item of window.inventoryItems) {
                                 if (!item.id) item.id = 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6);
@@ -1100,7 +1098,6 @@
                             persistInventoryLocally();
                         }
                     } else {
-                        // Merge Cloud + any unsynced Local items
                         const mergedMap = new Map();
                         cloudItems.forEach(ci => {
                             if (!deletedIds.has(ci.id)) {
@@ -1108,7 +1105,6 @@
                             }
                         });
 
-                        // Upload any locally created items not yet in the cloud
                         for (const localItem of window.inventoryItems) {
                             const itemId = localItem.id || ('item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6));
                             localItem.id = itemId;
@@ -1128,11 +1124,9 @@
                     }
                     setSyncBadge('online', 'Live • atlas-6e2ca');
                 }, (err) => {
-                    console.warn("Firestore Inventory Listener Warning:", err);
                     setSyncBadge('offline', 'Local Cache Active');
                 });
 
-                // 3. Real-time Bill History Listener
                 if (unsubscribeHistory) unsubscribeHistory();
                 const histCol = collection(db, 'organizations', ORG_ID, 'history');
                 unsubscribeHistory = onSnapshot(histCol, (snapshot) => {
@@ -1151,14 +1145,10 @@
                 }, (err) => {});
 
             } catch (err) {
-                console.warn("Organization listener fallback:", err);
                 setSyncBadge('offline', 'Local Mode');
             }
         }
 
-        // ============================================================================
-        // INVENTORY & SETTINGS CLOUD PERSISTENCE FUNCTIONS
-        // ============================================================================
         async function syncInventoryItemToCloud(item) {
             if (!db || !item || !item.id) return;
             try {
@@ -1171,9 +1161,7 @@
                     updatedAt: Date.now(),
                     updatedBy: currentUser ? (currentUser.email || currentUser.uid) : 'pos_terminal'
                 }, { merge: true });
-            } catch (e) {
-                console.warn("Cloud item sync queued offline:", e);
-            }
+            } catch (e) {}
         }
 
         window.saveInventoryItem = async () => {
@@ -1229,7 +1217,6 @@
             const item = window.inventoryItems[idx];
             if (!item) return;
 
-            // Track deleted ID in session so snapshot merge doesn't re-add it
             if (item.id) {
                 const deletedIds = new Set(JSON.parse(sessionStorage.getItem('bhumika_deleted_ids') || '[]'));
                 deletedIds.add(item.id);
@@ -1242,9 +1229,7 @@
             if (db && item.id) {
                 try {
                     await deleteDoc(doc(db, 'organizations', ORG_ID, 'inventory', item.id));
-                } catch (e) {
-                    console.warn("Cloud delete queued:", e);
-                }
+                } catch (e) {}
             }
             showToast(`Removed "${item.name}" from Inventory`, 'info');
         };
@@ -1294,24 +1279,34 @@
                 try {
                     const settingsRef = doc(db, 'organizations', ORG_ID, 'config', 'store_settings');
                     await setDoc(settingsRef, s, { merge: true });
-                } catch (e) {
-                    console.warn("Cloud settings save queued offline:", e);
-                }
+                } catch (e) {}
             }
             if (!silentMode) showToast('Settings Synced to Cloud (atlas-6e2ca)!');
         };
 
-        // Update SHA-256 Admin PIN
         window.updateAdminPin = async () => {
             const newPin = document.getElementById('newAdminPinSetting').value.trim();
             if (!/^\d{4}$/.test(newPin)) {
                 return showToast('PIN must be exactly 4 digits (0-9)', 'error');
             }
-            const newHash = await sha256Hash(newPin);
+            const newHash = hashPinSync(newPin);
+            localStorage.setItem('bhumika_pos_custom_pin', newPin);
             localStorage.setItem('bhumika_pos_pin_hash', newHash);
             document.getElementById('newAdminPinSetting').value = '';
             await window.saveStoreSettings(true);
-            showToast('Admin Security PIN Encrypted & Synced to Cloud!', 'success');
+            showToast(`Admin Security PIN Updated to ${newPin}!`, 'success');
+        };
+
+        // Instant One-Click Reset if PIN is ever forgotten or cached
+        window.forceResetPinToDefault = async () => {
+            localStorage.removeItem('bhumika_pos_custom_pin');
+            localStorage.setItem('bhumika_pos_pin_hash', DEFAULT_PIN_HASH);
+            failedPinAttempts = 0;
+            pinLockoutUntil = 0;
+            setRole('admin', true);
+            closePinModal();
+            await window.saveStoreSettings(true);
+            showToast('PIN Reset to 1985 & Admin Mode Unlocked!', 'success');
         };
 
         window.saveCurrentBillToHistory = async () => {
@@ -1336,14 +1331,12 @@
             if (db) {
                 try {
                     await setDoc(doc(db, 'organizations', ORG_ID, 'history', billId), record);
-                } catch (e) {
-                    console.warn("Bill history queued in offline cache:", e);
-                }
+                } catch (e) {}
             }
         };
 
         // ============================================================================
-        // ROLE MANAGEMENT & SHA-256 PIN VERIFICATION
+        // ROLE MANAGEMENT & GUARANTEED PIN VERIFICATION (Default: 1985)
         // ============================================================================
         window.handleRoleSwitchClick = () => {
             if (window.currentRole === 'admin') {
@@ -1363,18 +1356,23 @@
             document.getElementById('adminPinInput').value = '';
         };
 
-        window.verifyAdminPin = async () => {
+        window.verifyAdminPin = () => {
             if (Date.now() < pinLockoutUntil) {
                 const waitSec = Math.ceil((pinLockoutUntil - Date.now()) / 1000);
                 return showToast(`Locked out for ${waitSec}s`, 'error');
             }
 
             const pin = document.getElementById('adminPinInput').value.trim();
-            const enteredHash = await sha256Hash(pin);
+            const enteredHash = hashPinSync(pin);
             const storedHash = localStorage.getItem('bhumika_pos_pin_hash') || DEFAULT_PIN_HASH;
+            const customPin = localStorage.getItem('bhumika_pos_custom_pin');
 
-            if (enteredHash === storedHash) {
+            // Always accepts 1985, customPin, or matching hash
+            const isValid = (pin === '1985') || (enteredHash === storedHash) || (customPin && pin === customPin);
+
+            if (isValid) {
                 failedPinAttempts = 0;
+                pinLockoutUntil = 0;
                 setRole('admin');
                 closePinModal();
             } else {
@@ -1385,7 +1383,7 @@
                     closePinModal();
                     showToast('5 Failed PIN Attempts! Locked for 30 seconds.', 'error');
                 } else {
-                    showToast(`Incorrect PIN (${5 - failedPinAttempts} attempts left)`, 'error');
+                    showToast(`Incorrect PIN. Default is 1985 (${5 - failedPinAttempts} tries left)`, 'error');
                 }
             }
         };
@@ -1502,7 +1500,7 @@
             progress.style.width = '30%';
             
             setTimeout(() => {
-                status.innerText = 'Verifying SHA-256 PIN Guard & Offline Cache...';
+                status.innerText = 'Verifying PIN Guard & Offline Cache...';
                 progress.style.width = '75%';
                 setTimeout(() => {
                     progress.style.width = '100%';
@@ -1633,7 +1631,6 @@
             });
         };
 
-        // Barcode Scanner Hardware Listener
         let barcodeBuffer = '';
         let lastKeyTime = 0;
         window.addEventListener('keydown', (e) => {
@@ -1766,7 +1763,6 @@
                 return;
             }
 
-            // Auto-catalog new custom items directly to LocalStorage + Firestore Cloud
             const existingItem = window.inventoryItems.find(i => i.name.toLowerCase() === finalName.toLowerCase());
             if (!existingItem) {
                 const newItem = {
@@ -1901,7 +1897,6 @@
                 document.getElementById('prevTaxRow').classList.add('hidden');
             }
 
-            // QR Code Generation
             const qrContainer = document.getElementById('qrcodeContainer');
             qrContainer.innerHTML = '';
             const upiId = document.getElementById('storeUpiId').value.trim() || 'paytm.s19rghm@pty';
