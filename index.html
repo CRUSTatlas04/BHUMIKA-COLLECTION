@@ -1741,7 +1741,7 @@
             }
         };
         
-        window.addItem = async () => {
+        const addItem = async () => {
             const nameInput = document.getElementById('newItemName').value.trim();
             const qty = Math.max(1, parseInt(document.getElementById('newItemQty').value) || 1);
             let price = parseFloat(document.getElementById('newItemPrice').value);
@@ -1789,8 +1789,11 @@
             document.getElementById('searchAutocompleteDropdown').classList.add('hidden');
             updateReceipt();
         };
+        window.addItem = addItem;
 
-        window.clearCart = () => { window.cartItems = []; updateReceipt(); };
+        const clearCart = () => { window.cartItems = []; updateReceipt(); };
+        window.clearCart = clearCart;
+        
         window.removeItem = (idx) => { window.cartItems.splice(idx, 1); updateReceipt(); };
         window.updateItemQty = (idx, val) => { window.cartItems[idx].qty = Math.max(1, parseInt(val) || 1); updateReceipt(); };
         window.updateItemPrice = (idx, val) => { window.cartItems[idx].price = Math.max(0, parseFloat(val) || 0); updateReceipt(); };
@@ -1811,7 +1814,7 @@
             return { subtotal, totalQty, discount, taxAmt, grandTotal };
         }
 
-        window.updateReceipt = () => {
+        const updateReceipt = () => {
             document.getElementById('prevStoreName').innerText = document.getElementById('storeName').value || 'BHUMIKA COLLECTION';
             const phoneVal = document.getElementById('storePhone').value || '98765 43210';
             document.getElementById('prevStorePhone').innerText = phoneVal;
@@ -1926,6 +1929,7 @@
                 document.getElementById('prevQRSection').classList.add('hidden');
             }
         };
+        window.updateReceipt = updateReceipt;
 
         window.renderInventoryTable = () => {
             const tbody = document.getElementById('inventoryTableBody');
@@ -2070,7 +2074,7 @@
             if (activeBtn) activeBtn.className = activeBtn.className.replace('text-slate-400 hover:text-white hover:bg-slate-900/50', 'bg-slate-900 text-rose-400 shadow-sm');
         };
 
-        window.showToast = (msg, type='success') => {
+        const showToast = (msg, type='success') => {
             const c = document.getElementById('toastContainer');
             const bg = type==='success'?'bg-emerald-600':(type==='info'?'bg-indigo-600':'bg-rose-600');
             const t = document.createElement('div');
@@ -2080,6 +2084,7 @@
             setTimeout(() => { t.classList.remove('scale-95', 'opacity-0'); t.classList.add('scale-100', 'opacity-100'); }, 10);
             setTimeout(() => { t.classList.remove('scale-100', 'opacity-100'); t.classList.add('scale-95', 'opacity-0'); setTimeout(()=>t.remove(), 300); }, 3000);
         };
+        window.showToast = showToast;
 
         window.expressFastPrintAndNext = async () => {
             if (window.cartItems.length === 0) { showToast('Cart empty', 'error'); return; }
