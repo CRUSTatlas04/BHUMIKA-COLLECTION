@@ -1467,8 +1467,13 @@
             const source = document.getElementById('receiptPreviewPaper');
             const target = document.getElementById('modalReceiptClone');
             if (!source || !target) return;
+            
             target.className = source.className;
             target.innerHTML = source.innerHTML;
+            
+            // CRITICAL FIX: Remove IDs from the cloned HTML so they don't conflict 
+            // with the live preview elements on the right side of the screen.
+            target.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
         }
 
         window.openThermalPreviewModal = () => {
